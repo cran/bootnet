@@ -1,8 +1,16 @@
+# Defaults:
+importFrom(huge,"huge","huge.npn","huge.select")
+importFrom(parcor,"adalasso.net")
+
 # exportPattern("^[[:alpha:]]+")
 # Exports:
 export(bootnet)
 export(null)
 export(binarize)
+export(estimateNetwork)
+export(differenceTest)
+export(corStability)
+
 
 # Methods:
 S3method(summary, bootnet)
@@ -14,6 +22,7 @@ S3method(print, bootnetResult)
 
 # Imports:
 import(dplyr)
+import(parallel)
 importFrom(IsingFit,"IsingFit")
 import(qgraph)
 import(ggplot2)
@@ -31,3 +40,5 @@ importFrom(Matrix,"forceSymmetric")
  importFrom("methods", "is")
   importFrom("stats", "cor")
   importFrom("utils", "setTxtProgressBar", "txtProgressBar")
+    importFrom("stats", "na.omit", "quantile", "runif", "sd")
+  importFrom("utils", "data")

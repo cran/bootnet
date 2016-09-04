@@ -7,33 +7,47 @@
 # node2
 # value
 
-statTable <- function(x, name, alpha = 1, computeCentrality = TRUE){
+statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = c("edge","strength","closeness","betweenness")){
+  # Statistics can be:
+  if (!all(statistics %in% c("intercept","edge","length","distance","closeness","betweenness","strength"))){
+    stop("'statistics' must be 'edge', 'intercept', 'length', 'distance', 'closeness', 'betweenness' or 'strength'")
+  }
+  
+  
   type <- NULL
   value <- NULL
   
   stopifnot(is(x, "bootnetResult"))
   tables <- list()
+  if (is.null(x[['labels']])){
+    x[['labels']] <- seq_len(ncol(x[['graph']]))
+  }
   
   # edges:
   ind <- which(upper.tri(x[['graph']], diag=FALSE), arr.ind=TRUE)
-  tables$edges <- dplyr::tbl_df(data.frame(
-    name = name,
-    type = "edge",
-    node1 = x[['labels']][ind[,1]],
-    node2 = x[['labels']][ind[,2]],
-    value = x[['graph']][upper.tri(x[['graph']], diag=FALSE)],
-    stringsAsFactors = FALSE
+  
+  if ("edge" %in% statistics){
+    tables$edges <- dplyr::tbl_df(data.frame(
+      name = name,
+      type = "edge",
+      node1 = x[['labels']][ind[,1]],
+      node2 = x[['labels']][ind[,2]],
+      value = x[['graph']][upper.tri(x[['graph']], diag=FALSE)],
+      stringsAsFactors = FALSE
     ))
+  }
   
   
-  tables$length <- dplyr::tbl_df(data.frame(
-    name = name,
-    type = "length",
-    node1 = x[['labels']][ind[,1]],
-    node2 = x[['labels']][ind[,2]],
-    value = abs(1/abs(x[['graph']][upper.tri(x[['graph']], diag=FALSE)])),
-    stringsAsFactors = FALSE
-  ))
+  if ("length" %in% statistics){ 
+    tables$length <- dplyr::tbl_df(data.frame(
+      name = name,
+      type = "length",
+      node1 = x[['labels']][ind[,1]],
+      node2 = x[['labels']][ind[,2]],
+      value = abs(1/abs(x[['graph']][upper.tri(x[['graph']], diag=FALSE)])),
+      stringsAsFactors = FALSE
+    ))
+  }
   
   # Intercepts:
   if (!is.null(x[['intercepts']])){
@@ -49,9 +63,22 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE){
   
   if (computeCentrality){
     # Centrality analysis:
-    cent <- qgraph::centrality(x[['graph']], alpha = alpha)
+    if (all(x[['graph']]==0)){
+      cent <- list(
+        OutDegree = rep(0,ncol(x[['graph']])),
+        InDegree = rep(0,ncol(x[['graph']])),
+        Closeness = rep(0,ncol(x[['graph']])),
+        Betweenness = rep(0,ncol(x[['graph']])),
+        ShortestPathLengths = matrix(Inf,ncol(x[['graph']]),ncol(x[['graph']]))
+      )
+    } else {
+      cent <- qgraph::centrality(x[['graph']], alpha = alpha, all.shortest.paths = FALSE)
+      
+    }
     
     # strength:
+    if ("strength" %in% statistics){
+      
     tables$strength <- dplyr::tbl_df(data.frame(
       name = name,
       type = "strength",
@@ -60,8 +87,10 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE){
       value = cent[['OutDegree']],
       stringsAsFactors = FALSE
     ))
+    }
     
     # closeness:
+      if ("closeness" %in% statistics){
     tables$closeness <- dplyr::tbl_df(data.frame(
       name = name,
       type = "closeness",
@@ -70,9 +99,11 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE){
       value = cent[['Closeness']],
       stringsAsFactors = FALSE
     ))
+      }
     
     
     # betweenness:
+    if ("betweenness" %in% statistics){
     tables$betweenness <- dplyr::tbl_df(data.frame(
       name = name,
       type = "betweenness",
@@ -81,7 +112,9 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE){
       value = cent[['Betweenness']],
       stringsAsFactors = FALSE
     ))
+    }
     
+    if ("distance" %in% statistics){
     tables$sp <- dplyr::tbl_df(data.frame(
       name = name,
       type = "distance",
@@ -90,14 +123,19 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE){
       value = cent[['ShortestPathLengths']][upper.tri(cent[['ShortestPathLengths']], diag=FALSE)],
       stringsAsFactors = FALSE
     ))
+    }
     
-  
+    
   }
+  #   for (i in seq_along(tables)){
+  #     tables[[i]]$id <- ifelse(tables[[i]]$node2=='',paste0("N: ",tables[[i]]$node1),paste0("E: ",tables[[i]]$node1, "--", tables[[i]]$node2))
+  #   }  
+  
   for (i in seq_along(tables)){
-    tables[[i]]$id <- ifelse(tables[[i]]$node2=='',paste0("N: ",tables[[i]]$node1),paste0("E: ",tables[[i]]$node1, "--", tables[[i]]$node2))
+    tables[[i]]$id <- ifelse(tables[[i]]$node2=='',tables[[i]]$node1,paste0(tables[[i]]$node1, "--", tables[[i]]$node2))
   }  
   
-  tab <- dplyr::rbind_all(tables)
+  tab <- dplyr::bind_rows(tables)
   tab$nNode <- x$nNodes
   tab$nPerson <- x$nPerson
   
