@@ -8,17 +8,19 @@ Bootstrapped network estimation
 This function can be used to bootstrap network estimation methods so that the spread of parameter and centrality estimates can be assessed. Most important methods are \code{type = 'nonparametric'} for the non-parametric bootstrap and \code{type = 'case'} for the case-dropping bootstrap. See also Epskamp, Borsboom and Fried (2016) for more details.
 }
 \usage{
-bootnet(data, nBoots = 1000, default = c("none", "EBICglasso",
-                 "pcor", "IsingFit", "IsingLL"), type =
+bootnet(data, nBoots = 1000, default = c("none", "EBICglasso", "pcor","IsingFit",
+                  "IsingSampler", "huge","adalasso","mgm"), type =
                  c("nonparametric", "parametric", "node", "person",
                  "jackknife", "case"), nCores = 1, statistics = c("edge"
                  ,"strength","closeness","betweenness"), model = c("detect",
-                 "GGM", "Ising"), prepFun, prepArgs, estFun, estArgs,
+                 "GGM", "Ising"), fun, prepFun, prepArgs, estFun, estArgs,
                  graphFun, graphArgs, intFun, intArgs, verbose = TRUE,
-                 labels, alpha = 1, subNodes = 2:(ncol(data) - 1),
-                 subPersons = round(seq(0.25, 0.95, length = 10) *
-                 nrow(data)), computeCentrality = TRUE, propBoot = 1,
-                 replacement = TRUE, graph, sampleSize, intercepts)
+                 construct = c("default", "function", "arguments"), labels, 
+                 alpha = 1, caseMin = 0.05, caseMax = 0.75, caseN = 10,
+                 subNodes = 2:(ncol(data) - 1), subCases = round((1 -
+                 seq(caseMin, caseMax, length = caseN)) * nrow(data)),
+                 computeCentrality = TRUE, propBoot = 1, replacement =
+                 TRUE, graph, sampleSize, intercepts, weighted, signed,...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -42,6 +44,9 @@ Vector indicating which statistics to store. Can contain \code{"edge"}, \code{"s
 }
 \item{model}{
  The modeling framework to use. Automatically detects if data is binary or not.
+}
+\item{fun}{
+A custom estimation function, when no default set is used. This must be a function that takes the data as input (first argument) and returns either a weights matrix or a list containing the elements \code{"graph"} for the weights matrix, \code{"intercepts"} for the intercepts (optional) and \code{"results"} for the full estimation results (optional).
 }
   \item{prepFun}{
 See documentation at \code{\link[bootnet]{estimateNetwork}}.
@@ -79,7 +84,10 @@ A character vector containing the node labels. If omitted the column names of th
   \item{subNodes}{
     Range of nodes to sample in node-drop bootstrap
   }
-  \item{subPersons}{
+  \item{caseMin}{Minimum proportion of cases to drop when \code{type = "case"}.}
+    \item{caseMax}{Maximum proportion of cases to drop when \code{type = "case"}.}
+      \item{caseN}{Number of sampling levels to test when \code{type = "case"}.}
+  \item{subCases}{
   Range of persons to sample in person-drop bootstrap
   }
   \item{computeCentrality}{
@@ -94,6 +102,12 @@ A character vector containing the node labels. If omitted the column names of th
   \item{graph}{A given network structure to use in parametric bootstrap.}
   \item{sampleSize}{The samplesize to use in parametric bootstrap.}
   \item{intercepts}{Intercepts to use in parametric bootstrap.}
+  \item{construct}{How to construct the estimator? Set to \code{"arguments"} to use old functionality (not recommended).}
+\item{weighted}{Logical, should the analyzed network be weighted?}
+\item{signed}{Logical, should the analyzed network be signed?}
+  \item{\dots}{
+  Additional arguments used in the estimator function.
+  }
 }
 
 \value{
