@@ -56,6 +56,7 @@ bootnet <- function(
   intercepts, # for parametric bootstrap
   weighted,
   signed,
+  directed,
   ... # Other arguments
   # edgeResample = FALSE # If true, only resample edges from original estimate
   # scaleAdjust = FALSE
@@ -90,7 +91,10 @@ bootnet <- function(
       intercepts <- rep(0, Np)
     }
     
-
+    if (!missing(data)){
+      warning("'data' is ignored when using manual parametric bootstrap.")
+      data <- NULL
+    }
     manual <- TRUE
     dots <- list(...)
   } else {
@@ -116,6 +120,9 @@ bootnet <- function(
       if (missing(signed)){
         signed <- data$signed
       }
+      if (missing(directed)){
+        directed <- data$directed
+      }
       data <- data$data
       N <- ncol(data)
       Np <- nrow(data)
@@ -137,37 +144,58 @@ bootnet <- function(
         }
       }
       
-      
-      inputCheck <- checkInput(
-        default = default,
-        fun = fun,
-        prepFun = prepFun, # Fun to produce the correlation or covariance matrix
-        prepArgs = prepArgs, # list with arguments for the correlation function
-        estFun=estFun, # function that results in a network
-        estArgs=estArgs, # arguments sent to the graph estimation function (if missing automatically sample size is included)
-        graphFun=graphFun, # set to identity if missing
-        graphArgs=graphArgs, # Set to null if missing
-        intFun=intFun, # Set to null if missing
-        intArgs=intArgs, # Set to null if missing
-        sampleSize = Np,
-        construct = construct,
-        .dots = dots
-      )
-      
+      # 
+      # inputCheck <- checkInput(
+      #   default = default,
+      #   fun = fun,
+      #   prepFun = prepFun, # Fun to produce the correlation or covariance matrix
+      #   prepArgs = prepArgs, # list with arguments for the correlation function
+      #   estFun=estFun, # function that results in a network
+      #   estArgs=estArgs, # arguments sent to the graph estimation function (if missing automatically sample size is included)
+      #   graphFun=graphFun, # set to identity if missing
+      #   graphArgs=graphArgs, # Set to null if missing
+      #   intFun=intFun, # Set to null if missing
+      #   intArgs=intArgs, # Set to null if missing
+      #   sampleSize = Np,
+      #   construct = construct,
+      #   .dots = dots
+      # )
+      # 
       
     }
     
-    # Weighted and signed defaults
-    if (missing(weighted)){
-      weighted <- TRUE
-    }
-    if (missing(signed)){
-      signed <- TRUE
-    }
+
  
 
   }
   
+  
+  inputCheck <- checkInput(
+    default = default,
+    fun = fun,
+    prepFun = prepFun, # Fun to produce the correlation or covariance matrix
+    prepArgs = prepArgs, # list with arguments for the correlation function
+    estFun=estFun, # function that results in a network
+    estArgs=estArgs, # arguments sent to the graph estimation function (if missing automatically sample size is included)
+    graphFun=graphFun, # set to identity if missing
+    graphArgs=graphArgs, # Set to null if missing
+    intFun=intFun, # Set to null if missing
+    intArgs=intArgs, # Set to null if missing
+    sampleSize = Np,
+    construct = construct,
+    .dots = dots
+  )
+  
+  # Weighted and signed defaults
+  if (missing(weighted)){
+    weighted <- TRUE
+  }
+  if (missing(signed)){
+    signed <- TRUE
+  }
+  if (missing(directed)){
+    if (!default %in% c("graphicalVAR","relimp","DAG")) directed <- FALSE 
+  }
   
   
   if (type == "jackknife"){
@@ -245,7 +273,6 @@ bootnet <- function(
     
   } else {
    
-    
     sampleResult <- list(
       graph = graph,
       intercepts = intercepts,
@@ -254,7 +281,9 @@ bootnet <- function(
       nPerson = Np,
       estimator = inputCheck$estimator,
       arguments = inputCheck$arguments,
-      default = default
+      default = default,
+      weighted = weighted,
+      signed = signed
     )
     class(sampleResult) <- c("bootnetResult", "list")
     
@@ -272,9 +301,9 @@ bootnet <- function(
   # intArgs <- sampleResult$input$intArgs
 
   
-  if (!isSymmetric(as.matrix(sampleResult[['graph']]))){
-    stop("bootnet does not support directed graphs")
-  }
+  # if (!isSymmetric(as.matrix(sampleResult[['graph']]))){
+  #   stop("bootnet does not support directed graphs")
+  # }
   
   
   #   ### Observation-wise bootstrapping!
@@ -367,7 +396,8 @@ bootnet <- function(
                           verbose = FALSE,
                           weighted = weighted,
                           signed = signed,
-                          .input = inputCheck)
+                          .input = inputCheck,
+                          memorysaver = TRUE)
           
         }))
         if (is(res, "try-error")){
@@ -405,7 +435,7 @@ bootnet <- function(
       graph <- matrix(0,N,N)
     }
     if (missing(data)){
-      graph <- matrix(0,Np,N)
+      data <- matrix(0,Np,N)
     }
     if (missing(intercepts)){
       intercepts <- rep(0,N)
@@ -416,7 +446,7 @@ bootnet <- function(
     
     # Needed arguments to be excluded:
    excl <- c("prepFun", "prepArgs", "estFun", "estArgs", "graphFun", 
-             "graphArgs", "intFun", "intArgs")
+             "graphArgs", "intFun", "intArgs", "fun")
     
     clusterExport(cl, ls()[!ls()%in%c(excl,"cl")], envir = environment())
     # clusterExport(cl, export, envir = environment())
@@ -477,7 +507,8 @@ bootnet <- function(
                           labels = labels[inSample],
                           verbose = FALSE,
                           weighted = weighted,
-                          signed = signed)
+                          signed = signed,
+                          memorysaver = TRUE)
         }))
         if (is(res, "try-error")){
           if (tryCount == tryLimit) stop("Maximum number of errors in bootstraps reached")
@@ -512,7 +543,7 @@ bootnet <- function(
   if (verbose){
     message("Computing statistics...")
   }
-  statTableOrig <- statTable(sampleResult,  name = "sample", alpha = alpha, computeCentrality = computeCentrality,statistics=statistics)
+  statTableOrig <- statTable(sampleResult,  name = "sample", alpha = alpha, computeCentrality = computeCentrality,statistics=statistics, directed=directed)
   
   if (nCores == 1){
     if (verbose){
@@ -520,7 +551,7 @@ bootnet <- function(
     }
     statTableBoots <- vector("list", nBoots)
     for (b in seq_len(nBoots)){
-      statTableBoots[[b]] <- statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics)
+      statTableBoots[[b]] <- statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed)
       if (verbose){
         setTxtProgressBar(pb, b)
       }
@@ -530,7 +561,7 @@ bootnet <- function(
     }
   }  else {
     statTableBoots <- parLapply(cl,seq_len(nBoots),function(b){
-      statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics)
+      statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed)
     })
     # Stop the cluster:
     stopCluster(cl)

@@ -1,3 +1,7 @@
+# Folling R:
+mgm <- NULL
+mgmfit <- NULL
+
 # Null function:
 null <- function(...) NULL
 
@@ -68,13 +72,29 @@ bootnet_EBICglasso <- function(
   corMethod = c("cor_auto","cov","cor","npn"), # Correlation method
   missing = c("pairwise","listwise","stop"),
   sampleSize = c("maximum","minimim"), # Sample size when using missing = "pairwise"
-  verbose = verbose,
-  corArgs = list() # Extra arguments to the correlation function
+  verbose = TRUE,
+  corArgs = list(), # Extra arguments to the correlation function
+  refit = FALSE
 ){
   # Check arguments:
   corMethod <- match.arg(corMethod)
   missing <- match.arg(missing)
   sampleSize <- match.arg(sampleSize)
+  
+  # Message:
+  if (verbose){
+    msg <- "Estimating Network. Using package::function:"  
+    msg <- paste0(msg,"\n  - qgraph::EBICglasso for EBIC model selection\n    - using glasso::glasso")
+    if (corMethod == "cor_auto"){
+      msg <- paste0(msg,"\n  - qgraph::cor_auto for correlation computation\n    - using lavaan::lavCor")
+    }
+    if (corMethod == "npn"){
+      msg <- paste0(msg,"\n  - huge::huge.npn for nonparanormal transformation")
+    }
+    # msg <- paste0(msg,"\n\nPlease reference accordingly\n")
+    message(msg)
+  }
+  
   
   # First test if data is a data frame:
   if (!(is.data.frame(data) || is.matrix(data))){
@@ -145,7 +165,8 @@ bootnet_EBICglasso <- function(
   Results <- qgraph::EBICglasso(corMat,
                                 n =  sampleSize, 
                                 gamma = tuning,
-                                returnAllResults = TRUE)
+                                returnAllResults = TRUE,
+                                refit = refit)
   
   # Return:
   return(list(graph=Results$optnet,results=Results))
@@ -157,12 +178,42 @@ bootnet_pcor <- function(
   data, # Dataset used
   corMethod = c("cor_auto","cov","cor","npn"), # Correlation method
   missing = c("pairwise","listwise","stop"),
-  verbose = verbose,
-  corArgs = list() # Extra arguments to the correlation function
+  sampleSize = c("maximum","minimim"), # Sample size when using missing = "pairwise"
+  verbose = TRUE,
+  corArgs = list(), # Extra arguments to the correlation function
+  threshold = 0
 ){
   # Check arguments:
   corMethod <- match.arg(corMethod)
   missing <- match.arg(missing)
+  sampleSize <- match.arg(sampleSize)
+  
+  if (identical(threshold,"none")){
+    threshold <- 0
+  }
+  
+  # Message:
+  if (verbose){
+    msg <- "Estimating Network. Using package::function:"  
+    msg <- paste0(msg,"\n  - qgraph::qgraph(..., graph = 'pcor') for network computation")
+    if (corMethod == "cor_auto"){
+      msg <- paste0(msg,"\n  - qgraph::cor_auto for correlation computation\n    - using lavaan::lavCor")
+    }
+    if (corMethod == "npn"){
+      msg <- paste0(msg,"\n  - huge::huge.npn for nonparanormal transformation")
+    }
+    if (threshold != "none"){
+      if (threshold != "locfdr"){
+        msg <- paste0(msg,"\n  - psych::corr.p for significance thresholding")        
+      } else {
+        msg <- paste0(msg,"\n  - fdrtool for false discovery rate")        
+      }
+
+    }
+    # msg <- paste0(msg,"\n\nPlease reference accordingly\n")
+    message(msg)
+  }
+  
   
   # First test if data is a data frame:
   if (!(is.data.frame(data) || is.matrix(data))){
@@ -218,9 +269,19 @@ bootnet_pcor <- function(
     corMat <- do.call(corMethod,args)
   } else stop ("Correlation method is not supported.")
   
+  # Sample size:
+  if (missing == "listwise"){
+    sampleSize <- nrow(na.omit(data))
+  } else{
+    if (sampleSize == "maximum"){
+      sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
+    } else {
+      sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
+    }
+  } 
   
   # Estimate network:
-  Results <- getWmat(qgraph::qgraph(corMat,graph = "pcor",DoNotPlot = TRUE))
+  Results <- getWmat(qgraph::qgraph(corMat,graph = "pcor",DoNotPlot = TRUE,threshold=threshold, sampleSize = sampleSize))
   
   # Return:
   return(list(graph=Results,results=Results))
@@ -232,13 +293,22 @@ bootnet_IsingFit <- function(
   data, # Dataset used
   tuning = 0.25, # tuning parameter
   missing = c("listwise","stop"),
-  verbose = verbose,
+  verbose = TRUE,
   rule = c("AND","OR"),
   split = "median"
 ){
   # Check arguments:
   missing <- match.arg(missing)
   rule <- match.arg(rule)
+  
+  # Message:
+  if (verbose){
+    msg <- "Estimating Network. Using package::function:"  
+    msg <- paste0(msg,"\n  - IsingFit::IsingFit for network computation\n    - Using glmnet::glmnet")
+    # msg <- paste0(msg,"\n\nPlease reference accordingly\n")
+    message(msg)
+  }
+  
   
   # First test if data is a data frame:
   if (!(is.data.frame(data) || is.matrix(data))){
@@ -283,13 +353,21 @@ bootnet_IsingFit <- function(
 bootnet_IsingSampler <- function(
   data, # Dataset used
   missing = c("listwise","stop"),
-  verbose = verbose,
+  verbose = TRUE,
   split = "median",
   method = c("default","ll","pl","uni","bi")
 ){
   # Check arguments:
   missing <- match.arg(missing)
   method <- match.arg(method)
+  
+  # Message:
+  if (verbose){
+    msg <- "Estimating Network. Using package::function:"  
+    msg <- paste0(msg,"\n  - IsingSampler::EstimateIsing for network computation")
+    # msg <- paste0(msg,"\n\nPlease reference accordingly\n")
+    message(msg)
+  }
   
   # First test if data is a data frame:
   if (!(is.data.frame(data) || is.matrix(data))){
@@ -348,11 +426,19 @@ bootnet_IsingSampler <- function(
 bootnet_adalasso <- function(
   data, # Dataset used
   missing = c("listwise","stop"),
-  verbose = verbose,
+  verbose = TRUE,
   nFolds = 10 # Number of folds
 ){
   # Check arguments:
   missing <- match.arg(missing)
+  
+  # Message:
+  if (verbose){
+    msg <- "Estimating Network. Using package::function:"  
+    msg <- paste0(msg,"\n  - parcor::adalasso.net for network computation")
+    # msg <- paste0(msg,"\n\nPlease reference accordingly\n")
+    message(msg)
+  }
   
   # First test if data is a data frame:
   if (!(is.data.frame(data) || is.matrix(data))){
@@ -392,7 +478,7 @@ bootnet_huge <- function(
   data, # Dataset used
   tuning = 0.5,
   missing = c("listwise","stop"),
-  verbose = verbose,
+  verbose = TRUE,
   npn = TRUE, # Compute nonparanormal?
   criterion = c("ebic","ric","stars")
   # method = c("glasso","mb","ct")
@@ -401,6 +487,15 @@ bootnet_huge <- function(
   missing <- match.arg(missing)
   criterion <- match.arg(criterion)
   # method <- match.arg(method)
+  
+  # Message:
+  if (verbose){
+    msg <- "Estimating Network. Using package::function:"  
+    msg <- paste0(msg,"\n  - huge::huge for network computation")
+    msg <- paste0(msg,"\n  - huge::huge.npn for nonparanormal transformation")
+    # msg <- paste0(msg,"\n\nPlease reference accordingly\n")
+    message(msg)
+  }
   
   # First test if data is a data frame:
   if (!(is.data.frame(data) || is.matrix(data))){
@@ -448,7 +543,7 @@ bootnet_mgm <- function(
   lev,
   tuning = 0.5,
   missing = c("listwise","stop"),
-  verbose = verbose,
+  verbose = TRUE,
   criterion = c("EBIC","CV"),
   nFolds = 10,
   degree = 2,
@@ -458,7 +553,16 @@ bootnet_mgm <- function(
   # Check arguments:
   missing <- match.arg(missing)
   criterion <- match.arg(criterion)
+  rule <- match.arg(rule)
   # method <- match.arg(method)
+  
+  # Message:
+  if (verbose){
+    msg <- "Estimating Network. Using package::function:"  
+    msg <- paste0(msg,"\n  - mgm::mgm for network computation\n    - Using glmnet::glmnet")
+    # msg <- paste0(msg,"\n\nPlease reference accordingly\n")
+    message(msg)
+  }
   
   # First test if data is a data frame:
   if (!(is.data.frame(data) || is.matrix(data))){
@@ -492,6 +596,9 @@ bootnet_mgm <- function(
     }
     type <- ifelse(apply(data,2,function(x)all(x%in%c(0,1))),"c","g")
   }
+  if (length(type) != ncol(data)){
+    type <- rep(type, ncol(data))
+  }
   
   # Set lev automatically:
   if (missing(lev)){
@@ -501,22 +608,135 @@ bootnet_mgm <- function(
     
     lev <- ifelse(type == "c", apply(data,2,function(x)length(unique(x))),1)
   }
+  if (length(lev) != ncol(data)){
+    lev <- rep(lev, ncol(data))
+  }
   
   # Estimate:
-  log <- capture.output(Results <- mgmfit(data,type=type,lev=lev,lambda.sel = criterion,folds = nFolds,gam = tuning,d = degree,pbar = verbose))
-  
-  # Warn for unsigned:
-  if (any(Results$signs==0,na.rm = TRUE)){
-    warning("Bootnet does not support unsigned edges and treats these as positive edges.")
+  mgmfun <- "mgmfit"
+  if (packageVersion("mgm") >= "1.2.0"){
+    log <- capture.output(Results <- do.call(gsub("fit","",mgmfun),list(
+      data,verbatim = !verbose,  warnings = verbose, signInfo = FALSE,
+      type=type,
+      level=lev,
+      lambdaSel = criterion,
+      lambdaFolds = nFolds,
+      lambdaGam = tuning,
+      k = degree + 1,
+      pbar = verbose,
+      ruleReg = rule,
+      saveModels = FALSE, saveData = FALSE)))
+    
+    # Warn for unsigned:
+    if (any(Results$pairwise$signs==0,na.rm = TRUE)){
+      warning("Bootnet does not support unsigned edges and treats these as positive edges.")
+    }
+    Results$pairwise$signs[is.na(Results$pairwise$signs)] <- 0
+    
+    # Graph:
+    Graph <- Results$pairwise$wadj
+    Graph <- ifelse(Results$pairwise$signs==-1,-Graph,Graph)
+    
+  } else {
+    log <- capture.output(Results <- do.call(mgmfun,list(
+      data,
+      type=type,
+      lev=lev,
+      lambda.sel = criterion,
+      folds = nFolds,
+      gam = tuning,
+      d = degree,
+      pbar = verbose,
+      rule.reg = rule)))
+    
+    # Warn for unsigned:
+    if (any(Results$signs==0,na.rm = TRUE)){
+      warning("Bootnet does not support unsigned edges and treats these as positive edges.")
+    }
+    Results$signs[is.na(Results$signs)] <- 0
+    
+    # Graph:
+    Graph <- Results$wadj
+    Graph <- ifelse(Results$signs==-1,-Graph,Graph)
   }
-  Results$signs[is.na(Results$signs)] <- 0
-  
-  # Graph:
-  Graph <- Results$wadj
-  Graph <- ifelse(Results$signs==-1,-Graph,Graph)
-  
+
   # Return:
   return(list(
     graph=Graph,
     results=Results))
 }
+
+
+
+### RELATIVE IMPORTANCE ###
+bootnet_relimp <- function(
+  data, # Dataset used
+  normalized = TRUE,
+  type = "lmg",
+  structureDefault = c("none", "custom", "EBICglasso", "pcor","IsingFit","IsingSampler", "huge","adalasso","mgm"),
+  missing = c("listwise","stop"),
+  ..., # Arguments sent to the structure function
+  verbose = TRUE,
+  threshold = 0
+){
+  nVar <- ncol(data)
+  structureDefault <- match.arg(structureDefault)
+  
+  # Check missing:
+  missing <- match.arg(missing)
+  if (missing == "stop"){
+    if (any(is.na(data))){
+      stop("Missing data detected and missing = 'stop'")
+    }
+  } else {
+    # listwise:
+    data <- na.omit(data)
+  }
+  
+  # Compute structure (if needed)
+  if (structureDefault != "none"){
+    if (verbose){
+      message("Computing network structure")
+    }
+    if (structureDefault == "custom"){
+      struc <- estimateNetwork(data, ...)
+    } else {
+      struc <- estimateNetwork(data, default = structureDefault, ...)
+    }
+    struc <- struc$graph!=0
+  } else {
+    struc <- matrix(TRUE, nVar,nVar)
+  }
+  diag(struc) <- FALSE
+  
+  # Empty matrix:
+  relimp <- matrix(0, nVar,nVar)
+  if (is.null(names(data))){
+    names(data) <- paste0("V",seq_len(nVar))
+  }
+  Vars <- names(data)
+  
+  # For every node, compute incomming relative importance:
+  if (verbose){
+    message("Computing relative importance network")
+    pb <- txtProgressBar(0,nVar,style=3)
+  }
+  for (i in 1:nVar){
+    formula <- as.formula(paste0(Vars[i]," ~ ",paste0(Vars[-i][struc[-i,i]],collapse=" + ")))
+    res <- calc.relimp(formula, data, rela = normalized)
+    relimp[-i,i][struc[-i,i]] <- res@lmg
+    if (verbose){
+      setTxtProgressBar(pb, i)
+    }
+  }
+  if (verbose){
+    close(pb)
+  }
+  
+  # threshold:
+  relimp <- ifelse(relimp<threshold,0,relimp)
+  
+  # Return:
+  return(relimp)
+}
+
