@@ -11,7 +11,10 @@ summary.bootnetResult <- function(object, ...){
       )
 }
 
-plot.bootnetResult <- function(x,weighted, signed, directed, ...){
+plot.bootnetResult <- function(x,weighted, signed, directed, labels,
+                               layout = "spring",
+                               parallelEdge = TRUE, cut = 0,
+                               theme = "colorblind", ...){
 
   if (missing(weighted)){
     weighted <- x$weighted
@@ -31,5 +34,12 @@ plot.bootnetResult <- function(x,weighted, signed, directed, ...){
     wMat <- abs(wMat)
   }
   
-  qgraph::qgraph(wMat,labels=x[['labels']],directed=directed,...)
+  if (missing(labels)){
+    labels <- x[['labels']]
+  }
+  
+  qgraph::qgraph(wMat,labels=labels,directed=directed,
+                 parallelEdge = parallelEdge,
+                 theme = theme,
+                 cut = cut, layout = layout,  ...)
 }

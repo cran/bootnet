@@ -70,7 +70,7 @@ bootnet_EBICglasso <- function(
   data, # Dataset used
   tuning = 0.5, # tuning parameter
   corMethod = c("cor_auto","cov","cor","npn"), # Correlation method
-  missing = c("pairwise","listwise","stop"),
+  missing = c("pairwise","listwise","fiml","stop"),
   sampleSize = c("maximum","minimim"), # Sample size when using missing = "pairwise"
   verbose = TRUE,
   corArgs = list(), # Extra arguments to the correlation function
@@ -135,7 +135,9 @@ bootnet_EBICglasso <- function(
     corMat <- do.call(qgraph::cor_auto,args)
   } else if (corMethod%in%c("cor","cov")){
     # Normal correlations
-    
+    if (missing == "fiml"){
+      stop("missing = 'fiml' only supported with corMethod = 'cor_auto'")
+    }
     use <- switch(missing,
                   pairwise = "pairwise.complete.obs",
                   listwise = "complete.obs")
@@ -177,7 +179,7 @@ bootnet_EBICglasso <- function(
 bootnet_pcor <- function(
   data, # Dataset used
   corMethod = c("cor_auto","cov","cor","npn"), # Correlation method
-  missing = c("pairwise","listwise","stop"),
+  missing = c("pairwise","listwise","fiml","stop"),
   sampleSize = c("maximum","minimim"), # Sample size when using missing = "pairwise"
   verbose = TRUE,
   corArgs = list(), # Extra arguments to the correlation function
@@ -254,7 +256,9 @@ bootnet_pcor <- function(
     corMat <- do.call(qgraph::cor_auto,args)
   } else if (corMethod%in%c("cor","cov")){
     # Normal correlations
-    
+    if (missing == "fiml"){
+      stop("missing = 'fiml' only supported with corMethod = 'cor_auto'")
+    }
     use <- switch(missing,
                   pairwise = "pairwise.complete.obs",
                   listwise = "complete.obs")
@@ -569,10 +573,15 @@ bootnet_mgm <- function(
     stop("'data' argument must be a data frame")
   }
   
-  # If matrix coerce to data frame:
-  if (is.matrix(data)){
-    data <- as.data.frame(data)
-  }
+  # # If matrix coerce to data frame:
+  # if (is.matrix(data)){
+  #   data <- as.data.frame(data)
+  # }
+  # If is not a matrix coerce to matrix (because mgm is silly):
+  # if (!is.matrix(data)){
+    data <- as.matrix(data)
+  # }
+  
   
   # Obtain info from data:
   N <- ncol(data)
@@ -697,11 +706,37 @@ bootnet_relimp <- function(
   if (structureDefault != "none"){
     if (verbose){
       message("Computing network structure")
+      
+      msg <- "Computing network structure. Using package::function:"
+      if (structureDefault == "EBICglasso"){
+        msg <- paste0(msg,"\n  - qgraph::EBICglasso for EBIC model selection\n    - using glasso::glasso")
+      }
+      if (structureDefault == "pcor"){
+        msg <- paste0(msg,"\n  - qgraph::qgraph(..., graph = 'pcor') for network computation")
+      }
+      if (structureDefault == "IsingFit"){
+        msg <- paste0(msg,"\n  - IsingFit::IsingFit for network computation\n    - Using glmnet::glmnet")
+      }
+      if (structureDefault == "IsingSampler"){
+        msg <- paste0(msg,"\n  - IsingSampler::EstimateIsing for network computation")
+      }
+      if (structureDefault == "adalasso"){
+        msg <- paste0(msg,"\n  - parcor::adalasso.net for network computation")
+      }
+      if (structureDefault == "huge"){
+        msg <- paste0(msg,"\n  - huge::huge for network computation")
+        msg <- paste0(msg,"\n  - huge::huge.npn for nonparanormal transformation")
+      }
+      if (structureDefault == "mgm"){
+        msg <- paste0(msg,"\n  - mgm::mgm for network computation")
+      }
+      
+      message(msg)
     }
     if (structureDefault == "custom"){
       struc <- estimateNetwork(data, ...)
     } else {
-      struc <- estimateNetwork(data, default = structureDefault, ...)
+      struc <- estimateNetwork(data, default = structureDefault, ..., verbose = FALSE)
     }
     struc <- struc$graph!=0
   } else {
@@ -718,13 +753,32 @@ bootnet_relimp <- function(
   
   # For every node, compute incomming relative importance:
   if (verbose){
-    message("Computing relative importance network")
+  
+    msg <- "Computing relative importance network. Using package::function:\n  - relaimpo::calc.relimp for edge weight estimation"
+    message(msg)
+  
     pb <- txtProgressBar(0,nVar,style=3)
   }
   for (i in 1:nVar){
-    formula <- as.formula(paste0(Vars[i]," ~ ",paste0(Vars[-i][struc[-i,i]],collapse=" + ")))
-    res <- calc.relimp(formula, data, rela = normalized)
-    relimp[-i,i][struc[-i,i]] <- res@lmg
+    if (any(struc[-i,i])){
+      formula <- as.formula(paste0(Vars[i]," ~ ",paste0(Vars[-i][struc[-i,i]],collapse=" + ")))
+      if (sum(struc[-i,i])==1){
+
+        # Only one predictor
+        if (normalized){
+          relimp[-i,i][struc[-i,i]] <- 1
+        } else {
+          res <- lm(formula, data)
+          sum <- summary(res)
+          relimp[-i,i][struc[-i,i]] <- sum$r.squared
+        }
+        
+      } else {
+        res <- calc.relimp(formula, data, rela = normalized)
+        relimp[-i,i][struc[-i,i]] <- res@lmg              
+      }
+
+    }
     if (verbose){
       setTxtProgressBar(pb, i)
     }
