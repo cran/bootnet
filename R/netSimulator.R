@@ -36,10 +36,14 @@ ggmGenerator <- function(
     
     # Remove diag:
     diag(graph) <- 0
-    
+  
     # Generate data:
     # True sigma:
+    if (any(eigen(diag(ncol(graph)) - graph)$values < 0)){
+      stop("Precision matrix is not positive semi-definite")
+    }
     Sigma <- cov2cor(solve(diag(ncol(graph)) - graph))
+    
     
     # Generate data:
     Data <- mvtnorm::rmvnorm(n, sigma = Sigma)
@@ -58,7 +62,12 @@ ggmGenerator <- function(
   } else {
     deparsedEstimator[l] <- sprintf('
     for (i in 1:ncol(Data)){
-      Data[,i] <- as.numeric(cut(Data[,i],sort(c(-Inf,rnorm(%f-1),Inf))))
+      if (is.null(input$thresholds)){
+        Data[,i] <- as.numeric(cut(Data[,i],sort(c(-Inf,rnorm(%f-1),Inf))))
+      } else {
+        Data[,i] <- as.numeric(cut(Data[,i],sort(c(-Inf,input$thresholds[[i]],Inf))))
+      }
+  
     }',nLevels)
   }
   
@@ -123,16 +132,19 @@ IsingGenerator <- function(
 
 
 netSimulator <- function(
-  input = genGGM(Nvar = 10),  # A matrix, or a list with graph and intercepts elements.
+  input = genGGM(Nvar = 10),  # A matrix, or a list with graph and intercepts elements. Or a generating function
   nCases = c(50,100,250,500,1000,2500), # Number of cases
   nReps = 100, # Number of repititions per condition
   nCores = 1, # Number of computer cores used
   default,
   dataGenerator, 
-  ... # estimateNetwork arguments (if none specified, will default to default = "EBICglasso)
+  ..., # estimateNetwork arguments (if none specified, will default to default = "EBICglasso)
+  moreArgs = list(), # List of extra args not intended to be varied as conditions
+  moreOutput = list() # List with functions that take two weights matrices and produce some value
 ){
   # Dots list:
   .dots <- list(...)
+  # default <- match.arg(default)
   
   # Check default and dataGenerator:
   if (missing(default) & missing(dataGenerator)){
@@ -148,7 +160,7 @@ netSimulator <- function(
   # Data generator:
   if (!missing(default) & missing(dataGenerator)){
     
-    if (default == "EBICglasso" || default == "glasso" || default == "pcor" || default == "adalasso" || default == "huge"){
+    if (default == "EBICglasso" || default == "glasso" || default == "pcor" || default == "adalasso" || default == "huge"|| default == "ggmModSelect" || default == "LoGo"){
       message("Setting 'dataGenerator = ggmGenerator(ordinal = FALSE)'")
       dataGenerator <- ggmGenerator(ordinal = FALSE)
     } else if (default == "IsingFit" || default == "IsingSampler"){
@@ -160,6 +172,10 @@ netSimulator <- function(
     
     
   }
+  
+  
+  # Else none:
+  if (missing(default)) default <- "none"
   
   # parSim arguments:
   Args <- c(
@@ -173,7 +189,7 @@ netSimulator <- function(
       nCores = nCores,
       reps = nReps,
       debug=FALSE,
-      export = c("input","dataGenerator",".dots"),
+      export = c("input","dataGenerator",".dots","moreArgs","moreOutput"),
       
       expression = expression({
         cor0 <- function(x,y){
@@ -194,7 +210,7 @@ netSimulator <- function(
         } else {
           inputResults <- input
         }
-        
+
         # True network:
         if (is.list(inputResults)){
           trueNet <- inputResults$graph
@@ -210,6 +226,7 @@ netSimulator <- function(
         args$data <- Data
         args$verbose <- FALSE
         args$default <- default
+        args <- c(args,moreArgs)
         
         for (i in seq_along(.dots)){
           args[[names(.dots)[i]]] <- get(names(.dots)[i])
@@ -257,6 +274,32 @@ netSimulator <- function(
         SimulationResults$strength <- cor0(centTrue$OutDegree,centEst$OutDegree)
         SimulationResults$closeness <- cor0(centTrue$Closeness,centEst$Closeness)
         SimulationResults$betweenness <- cor0(centTrue$Betweenness,centEst$Betweenness)
+        SimulationResults$ExpectedInfluence <- cor0(centTrue$OutExpectedInfluence,centEst$OutExpectedInfluence)
+
+        # 
+        # ### TEMP: REMOVE:
+        # SimulationResults$MeanBiasFalsePositives <- mean(abs(est[real==0 & est!=0]))
+        # # SimulationResults$Q75BiasFalsePositives <- quantile(abs(est[real==0 & est!=0]), 0.75)
+        # SimulationResults$MaxBiasFalsePositives <- max(abs(est[real==0 & est!=0]))
+        # SimulationResults$MaxWeight <- max(abs(est))
+        # SimulationResults$MeanWeight <- mean(abs(est[est!=0]))
+        if (any(real==0 & est!=0)){
+          SimulationResults$MaxFalseEdgeWidth <- max(abs(est[real==0 & est!=0])) / max(abs(est))
+        } else {
+          SimulationResults$MaxFalseEdgeWidth <- NA
+        }
+
+        SimulationResults$bias <- mean(abs(est - real))
+        # ##
+        if (length(moreOutput) > 1){
+          if (is.null(names(moreOutput))){
+            names(moreOutput) <- paste0("moreOutput",seq_along(moreOutput))
+          }
+          
+          for (out in seq_along(moreOutput)){
+            SimulationResults[[out]] <- moreOutput[[i]](estNet, trueNet)
+          }
+        }
         
         SimulationResults
       })),

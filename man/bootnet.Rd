@@ -8,20 +8,16 @@ Bootstrapped network estimation
 This function can be used to bootstrap network estimation methods so that the spread of parameter and centrality estimates can be assessed. Most important methods are \code{type = 'nonparametric'} for the non-parametric bootstrap and \code{type = 'case'} for the case-dropping bootstrap. See also Epskamp, Borsboom and Fried (2016) for more details.
 }
 \usage{
-bootnet(data, nBoots = 1000, default = c("none", "EBICglasso", "pcor","IsingFit",
-                  "IsingSampler", "huge","adalasso","mgm","relimp"), type =
-                 c("nonparametric", "parametric", "node", "person",
-                 "jackknife", "case"), nCores = 1, statistics = c("edge"
-                 ,"strength","closeness","betweenness"), model = c("detect",
-                 "GGM", "Ising"), fun, prepFun, prepArgs, estFun, estArgs,
-                 graphFun, graphArgs, intFun, intArgs, verbose = TRUE,
-                 construct = c("default", "function", "arguments"), labels, 
-                 alpha = 1, caseMin = 0.05, caseMax = 0.75, caseN = 10,
-                 subNodes = 2:(ncol(data) - 1), subCases = round((1 -
-                 seq(caseMin, caseMax, length = caseN)) * nrow(data)),
-                 computeCentrality = TRUE, propBoot = 1, replacement =
-                 TRUE, graph, sampleSize, intercepts, weighted, signed,
-                 directed, ...)
+bootnet(data, nBoots = 1000,default = c("none", "EBICglasso", "ggmModSelect", "pcor",
+  "IsingFit","IsingSampler", "huge","adalasso","mgm","relimp","cor","TMFG", 
+  "ggmModSelect", "LoGo"), type = c("nonparametric","parametric","node","person",
+  "jackknife","case"), nCores = 1, statistics = c("edge","strength","closeness",
+  "betweenness","outStrength","inStrength"), model = c("detect","GGM","Ising",
+  "graphicalVAR"), fun, prepFun,prepArgs, estFun, estArgs, graphFun, graphArgs, 
+  intFun, intArgs, verbose = TRUE, construct = c("default","function","arguments"),
+  labels, alpha = 1, caseMin = 0.05, caseMax = 0.75, caseN = 10, subNodes, subCases,
+  computeCentrality = TRUE, propBoot = 1, replacement = TRUE, graph, sampleSize, 
+  intercepts, weighted, signed, directed, ...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -41,7 +37,7 @@ A string indicating the method to use. See documentation at \code{\link[bootnet]
 Number of cores to use in computing results. Set to 1 to not use parallel computing.
 }
 \item{statistics}{
-Vector indicating which statistics to store. Can contain \code{"edge"}, \code{"strength"}, \code{"closeness"}, \code{"betweenness"}, \code{"length"} and \code{"distance"}. By default, length and distance are not stored.
+Vector indicating which statistics to store. Can contain \code{"edge"}, \code{"strength"}, \code{"closeness"}, \code{"betweenness"}, \code{"length"}, \code{"distance"}, \code{"expectedInfluence"}, \code{"inExpectedInfluence"}, or \code{"outExpectedInfluence"}. By default, length and distance are not stored.
 }
 \item{model}{
  The modeling framework to use. Automatically detects if data is binary or not.

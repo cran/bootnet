@@ -1,7 +1,8 @@
 
 # Function that checks input and returns the functions:
 checkInput <- function(
-  default = c("none", "EBICglasso", "pcor","IsingFit","IsingSampler", "huge","adalasso","mgm","relimp"),
+  default = c("none", "EBICglasso","ggmModSelect", "pcor","IsingFit","IsingSampler", "huge","adalasso","mgm","relimp", 
+              "cor","TMFG","ggmModSelect","LoGo","graphicalVAR"),
   fun, # Estimator function
   prepFun, # Fun to produce the correlation or covariance matrix
   prepArgs, # list with arguments for the correlation function
@@ -149,12 +150,16 @@ checkInput <- function(
       Function <- fun
     } else if (default == "EBICglasso"){
       Function <- bootnet_EBICglasso
+    } else if (default == "ggmModSelect"){
+      Function <- bootnet_ggmModSelect
     } else if (default == "IsingFit"){
       Function <- bootnet_IsingFit
     } else if (default == "IsingSampler"){
       Function <- bootnet_IsingSampler
     } else if (default == "pcor"){
       Function <- bootnet_pcor
+    } else if (default == "cor"){
+      Function <- bootnet_cor
     } else if (default == "adalasso"){
       Function <- bootnet_adalasso
     } else if (default == "huge"){
@@ -163,6 +168,12 @@ checkInput <- function(
       Function <- bootnet_mgm
     } else if (default == "relimp"){
       Function <- bootnet_relimp
+    } else if (default == "TMFG"){
+      Function <- bootnet_TMFG
+    } else if (default == "LoGo"){
+      Function <- bootnet_LoGo
+    } else if (default == "graphicalVAR"){
+      Function <- bootnet_graphicalVAR  
     } else stop("Currently not supported.")
     
   } else {

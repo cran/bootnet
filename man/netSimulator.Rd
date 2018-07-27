@@ -1,11 +1,12 @@
 \name{netSimulator}
 \alias{netSimulator}
+\alias{replicationSimulator}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 Network Estimation Performance
 }
 \description{
-This function can be used to run a simulation study on the performance of network estimation by varying sample size or any argument used as input to \code{\link{estimateNetwork}}. The purpose of this function is to provide a way to assess the required sample size given a network structure, as well as to easily perform simulation studies. By default, the function uses \code{\link{genGGM}} to simulate a chain graph or small-world network. See details for more information.
+This function can be used to run a simulation study on the performance of network estimation by varying sample size or any argument used as input to \code{\link{estimateNetwork}}. The purpose of this function is to provide a way to assess the required sample size given a network structure, as well as to easily perform simulation studies. By default, the function uses \code{\link{genGGM}} to simulate a chain graph or small-world network. See details for more information. The \code{replicationSimulator} function instead assesses how well a network based on a second independent sample would replicate the network based on the first independent sample.
 }
 \usage{
 netSimulator(
@@ -15,7 +16,19 @@ netSimulator(
       nCores = 1, 
       default,
       dataGenerator, 
-    ...)
+      ...,
+      moreArgs = list(),
+      moreOutput = list())
+    
+replicationSimulator(
+      input = genGGM(Nvar = 10), 
+      nCases = c(50, 100, 250, 500, 1000, 2500), 
+      nReps = 100,
+      nCores = 1, 
+      default,
+      dataGenerator, 
+      ..., 
+      moreArgs = list())
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -37,6 +50,8 @@ Default set used (see \code{\link{estimateNetwork}}). In most cases, this will s
   \item{dataGenerator}{
 A function that generates data. The first argument must be the sample size, the second argument must be the output of \code{input}. Can often be ignored if \code{default} is set.
 }
+\item{moreArgs}{A named list of arguments to be used when estimating the network, but which should not be interpreted as different conditions. Use this argument to assign arguments that require vectors.}
+\item{moreOutput}{List with functions that take the estimated weights matrix as first argument and the true weights matrix as second argument to produce some output.}
   \item{\dots}{
 Arguments used by \code{\link{estimateNetwork}} to estimate the network structure. Providing a vector for any argument will simulate under each value. This way, any argument in \code{\link{estimateNetwork}} can be used in a simulation study.
 }

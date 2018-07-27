@@ -8,9 +8,27 @@
 # value
 
 statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = c("edge","strength","closeness","betweenness"), directed = FALSE){
+  # If list, table for every graph!
+  if (is.list(x$graph)){
+    Tables <- list()
+    for (i in seq_len(length(x$graph))){
+      dummyobject <- x
+      dummyobject$graph <- x$graph[[i]]
+      dummyobject$directed <- x$directed[[i]]
+      Tables[[i]] <- statTable(dummyobject,name=name,alpha=alpha,computeCentrality = computeCentrality,statistics=statistics,directed=dummyobject$directed)
+      Tables[[i]]$graph <- names(x$graph)[[i]]
+    }
+    return(dplyr::bind_rows(Tables))
+  }
+  
+  
   # Statistics can be:
-  if (!all(statistics %in% c("intercept","edge","length","distance","closeness","betweenness","strength"))){
-    stop("'statistics' must be 'edge', 'intercept', 'length', 'distance', 'closeness', 'betweenness' or 'strength'")
+  # Change first letter of statistics to lowercase:
+  substr(statistics,0,1) <- tolower(substr(statistics,0,1))
+  
+  if (!all(statistics %in% c("intercept","edge","length","distance","closeness","betweenness","strength","expectedInfluence",
+                             "outStrength","outExpectedInfluence","inStrength","inExpectedInfluence","rspbc","hybrid"))){
+    stop("'statistics' must be 'edge', 'intercept', 'length', 'distance', 'closeness', 'betweenness', 'strength', 'inStrength', 'outStrength', 'expectedInfluence', 'inExpectedInfluence', 'outExpectedInfluence', 'rspbc', 'hybrid'")
   }
   
   
@@ -78,7 +96,9 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
         InDegree = rep(0,ncol(x[['graph']])),
         Closeness = rep(0,ncol(x[['graph']])),
         Betweenness = rep(0,ncol(x[['graph']])),
-        ShortestPathLengths = matrix(Inf,ncol(x[['graph']]),ncol(x[['graph']]))
+        ShortestPathLengths = matrix(Inf,ncol(x[['graph']]),ncol(x[['graph']])),
+        RSPBC = rep(0,ncol(x[['graph']])),
+        Hybrid = rep(0,ncol(x[['graph']]))
       )
     } else {
       cent <- qgraph::centrality(Wmat, alpha = alpha, all.shortest.paths = FALSE)
@@ -86,8 +106,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     }
     
     # strength:
-    if ("strength" %in% statistics){
-      
+    if ("strength" %in% statistics & !directed){
     tables$strength <- dplyr::tbl_df(data.frame(
       name = name,
       type = "strength",
@@ -96,6 +115,29 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
       value = cent[['OutDegree']],
       stringsAsFactors = FALSE
     ))
+    }
+    
+    if ("outStrength" %in% statistics && directed){
+      
+      tables$outStrength <- dplyr::tbl_df(data.frame(
+        name = name,
+        type = "outStrength",
+        node1 = x[['labels']],
+        node2 = '',
+        value = cent[['OutDegree']],
+        stringsAsFactors = FALSE
+      ))
+    }
+    if ("inStrength" %in% statistics && directed){
+      
+      tables$inStrength <- dplyr::tbl_df(data.frame(
+        name = name,
+        type = "inStrength",
+        node1 = x[['labels']],
+        node2 = '',
+        value = cent[['InDegree']],
+        stringsAsFactors = FALSE
+      ))
     }
     
     # closeness:
@@ -134,7 +176,65 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     ))
     }
     
+    if ("expectedInfluence" %in% statistics && !directed){
+      
+      tables$expectedInfluence <- dplyr::tbl_df(data.frame(
+        name = name,
+        type = "expectedInfluence",
+        node1 = x[['labels']],
+        node2 = '',
+        value = cent[['OutExpectedInfluence']],
+        stringsAsFactors = FALSE
+      ))
+    }
+
+    # randomized shortest paths betweenness centrality:
+    if ("rspbc" %in% statistics){
+    tables$rspbc <- dplyr::tbl_df(data.frame(
+      name = name,
+      type = "rspbc",
+      node1 = x[['labels']],
+      node2 = '',
+      value = as.vector(NetworkToolbox::rspbc(abs(Wmat))),
+      stringsAsFactors = FALSE
+    ))
+    }
     
+    # hybrid:
+    if ("hybrid" %in% statistics){
+    tables$hybrid <- dplyr::tbl_df(data.frame(
+      name = name,
+      type = "hybrid",
+      node1 = x[['labels']],
+      node2 = '',
+      value = as.vector(NetworkToolbox::hybrid(abs(Wmat), BC = "random")),
+      stringsAsFactors = FALSE
+    ))
+    }
+
+    if ("outExpectedInfluence" %in% statistics && directed){
+      
+      tables$outExpectedInfluence <- dplyr::tbl_df(data.frame(
+        name = name,
+        type = "outExpectedInfluence",
+        node1 = x[['labels']],
+        node2 = '',
+        value = cent[['OutExpectedInfluence']],
+        stringsAsFactors = FALSE
+      ))
+    }
+    if ("inExpectedInfluence" %in% statistics && directed){
+      
+      tables$inExpectedInfluence <- dplyr::tbl_df(data.frame(
+        name = name,
+        type = "inExpectedInfluence",
+        node1 = x[['labels']],
+        node2 = '',
+        value = cent[['InExpectedInfluence']],
+        stringsAsFactors = FALSE
+      ))
+    }
+        
   }
   #   for (i in seq_along(tables)){
   #     tables[[i]]$id <- ifelse(tables[[i]]$node2=='',paste0("N: ",tables[[i]]$node1),paste0("E: ",tables[[i]]$node1, "--", tables[[i]]$node2))
@@ -145,7 +245,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
   }  
   
   tab <- dplyr::bind_rows(tables)
-  tab$nNode <- x$nNodes
+  tab$nNode <- x$nNode
   tab$nPerson <- x$nPerson
   
   # Compute rank:
@@ -153,6 +253,9 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     mutate(rank_avg = rank(value,ties.method = "average"),
            rank_min = rank(value,ties.method = "min"),
            rank_max = rank(value,ties.method = "max"))
+  
+  
+  tab$graph <- "1"
   
   return(tab)
 }

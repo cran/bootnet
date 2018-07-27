@@ -1,12 +1,24 @@
+import(pbapply)
+
+importFrom(NetworkToolbox,"TMFG")
+
 # Default functions:
 export(bootnet_IsingFit)
 export(bootnet_EBICglasso)
+export(bootnet_ggmModSelect)
 export(bootnet_pcor)
+export(bootnet_cor)
 export(bootnet_IsingSampler)
 export(bootnet_adalasso)
 export(bootnet_huge)
 export(bootnet_mgm)
 export(bootnet_relimp)
+export(bootnet_TMFG)
+export(bootnet_LoGo)
+export(bootnet_ggmModSelect)
+export(bootnet_graphicalVAR)
+
+
 
 # Defaults:
 importFrom(huge,"huge","huge.npn","huge.select")
@@ -36,6 +48,11 @@ S3method(summary, netSimulator)
 S3method(plot, netSimulator)
 S3method(print, netSimulator)
 
+S3method(summary, replicationSimulator)
+S3method(plot, replicationSimulator)
+S3method(print, replicationSimulator)
+
+export(replicationSimulator)
 export(netSimulator)
 export(genGGM)
 export(ggmGenerator)
@@ -57,6 +74,7 @@ importFrom(mvtnorm, "rmvnorm")
 importFrom(IsingSampler, "EstimateIsing")
 importFrom(abind,"abind")
 importFrom(Matrix,"forceSymmetric")
+importFrom(BDgraph, "bdgraph.sim")
 
 #export(centrality)
 
