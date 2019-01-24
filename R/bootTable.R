@@ -7,7 +7,9 @@
 # node2
 # value
 
-statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = c("edge","strength","closeness","betweenness"), directed = FALSE){
+statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = c("edge","strength","closeness","betweenness"), directed = FALSE,
+                      communities=NULL,
+                      useCommunities="all", includeDiagonal = FALSE,...){
   # If list, table for every graph!
   if (is.list(x$graph)){
     Tables <- list()
@@ -15,7 +17,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
       dummyobject <- x
       dummyobject$graph <- x$graph[[i]]
       dummyobject$directed <- x$directed[[i]]
-      Tables[[i]] <- statTable(dummyobject,name=name,alpha=alpha,computeCentrality = computeCentrality,statistics=statistics,directed=dummyobject$directed)
+      Tables[[i]] <- statTable(dummyobject,name=name,alpha=alpha,computeCentrality = computeCentrality,statistics=statistics,directed=dummyobject$directed,includeDiagonal=includeDiagonal)
       Tables[[i]]$graph <- names(x$graph)[[i]]
     }
     return(dplyr::bind_rows(Tables))
@@ -25,10 +27,12 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
   # Statistics can be:
   # Change first letter of statistics to lowercase:
   substr(statistics,0,1) <- tolower(substr(statistics,0,1))
-  
-  if (!all(statistics %in% c("intercept","edge","length","distance","closeness","betweenness","strength","expectedInfluence",
-                             "outStrength","outExpectedInfluence","inStrength","inExpectedInfluence","rspbc","hybrid"))){
-    stop("'statistics' must be 'edge', 'intercept', 'length', 'distance', 'closeness', 'betweenness', 'strength', 'inStrength', 'outStrength', 'expectedInfluence', 'inExpectedInfluence', 'outExpectedInfluence', 'rspbc', 'hybrid'")
+  validStatistics <-  c("intercept","edge","length","distance","closeness","betweenness","strength","expectedInfluence",
+                        "outStrength","outExpectedInfluence","inStrength","inExpectedInfluence","rspbc","hybrid",
+                        "bridgeStrength", "bridgeCloseness", "bridgeBetweenness",
+                        "bridgeExpectedInfluence")
+  if (!all(statistics %in% validStatistics)){
+    stop(paste0("'statistics' must be one of: ",paste0("'",validStatistics,"'",collapse=", ")))
   }
   
   
@@ -46,7 +50,12 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     index <- upper.tri(x[['graph']], diag=FALSE)
     ind <- which(index, arr.ind=TRUE)
   } else {
-    index <- diag(ncol(x[['graph']]))!=1
+    if (!includeDiagonal){
+      index <- diag(ncol(x[['graph']]))!=1      
+    } else {
+      index <- matrix(TRUE,ncol(x[['graph']]),ncol(x[['graph']]))
+    }
+
     ind <- which(index, arr.ind=TRUE)
   }
   
@@ -98,11 +107,32 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
         Betweenness = rep(0,ncol(x[['graph']])),
         ShortestPathLengths = matrix(Inf,ncol(x[['graph']]),ncol(x[['graph']])),
         RSPBC = rep(0,ncol(x[['graph']])),
-        Hybrid = rep(0,ncol(x[['graph']]))
+        Hybrid = rep(0,ncol(x[['graph']])),
+        step1 = rep(0,ncol(x[['graph']])),
+        expectedInfluence = rep(0,ncol(x[['graph']])),
+        bridgeStrength= rep(0,ncol(x[['graph']])),
+        bridgeCloseness= rep(0,ncol(x[['graph']])),
+        bridgeBetweenness= rep(0,ncol(x[['graph']])),
+        bridgeExpectedInfluence= rep(0,ncol(x[['graph']]))
       )
     } else {
       cent <- qgraph::centrality(Wmat, alpha = alpha, all.shortest.paths = FALSE)
-      
+      # EI <- expectedInf(Wmat, step="1")
+      # names(EI) <- "expectedInfluence"
+      bridgecen <- c("bridgeStrength", "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")
+      if(any(bridgecen %in% statistics)){
+        if(is.null(communities)){
+          warning("If bridge statistics are to be bootstrapped, the communities argument should be provided")
+          b <-  networktools::bridge(Wmat,...)
+          names(b) <- c(bridgecen, "bridgeExpectedInfluence2step","communities")
+        } else {
+          b <- networktools::bridge(Wmat, communities=communities, useCommunities=useCommunities)
+          names(b) <- c(bridgecen, "bridgeExpectedInfluence2step","communities")
+        }
+      } else {
+        b <- NULL
+      }
+      cent <- c(cent, b)
     }
     
     # strength:
@@ -118,7 +148,6 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     }
     
     if ("outStrength" %in% statistics && directed){
-      
       tables$outStrength <- dplyr::tbl_df(data.frame(
         name = name,
         type = "outStrength",
@@ -231,6 +260,55 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
         node1 = x[['labels']],
         node2 = '',
         value = cent[['InExpectedInfluence']],
+        stringsAsFactors = FALSE
+      ))
+    }
+    
+    
+    # bridgeStrength:
+    if ("bridgeStrength" %in% statistics){
+      tables$bridgeStrength <- dplyr::tbl_df(data.frame(
+        name = name,
+        type = "bridgeStrength",
+        node1 = x[['labels']],
+        node2 = '',
+        value = cent[['bridgeStrength']],
+        stringsAsFactors = FALSE
+      ))
+    }
+    
+    # bridgeCloseness:
+    if ("bridgeCloseness" %in% statistics){
+      tables$bridgeCloseness <- dplyr::tbl_df(data.frame(
+        name = name,
+        type = "bridgeCloseness",
+        node1 = x[['labels']],
+        node2 = '',
+        value = cent[['bridgeCloseness']],
+        stringsAsFactors = FALSE
+      ))
+    }
+    
+    # bridgeBetweenness:
+    if ("bridgeBetweenness" %in% statistics){
+      tables$bridgeBetweenness <- dplyr::tbl_df(data.frame(
+        name = name,
+        type = "bridgeBetweenness",
+        node1 = x[['labels']],
+        node2 = '',
+        value = cent[['bridgeBetweenness']],
+        stringsAsFactors = FALSE
+      ))
+    }
+    
+    # bridgeExpectedInfluence:
+    if ("bridgeExpectedInfluence" %in% statistics){
+      tables$bridgeExpectedInfluence <- dplyr::tbl_df(data.frame(
+        name = name,
+        type = "bridgeExpectedInfluence",
+        node1 = x[['labels']],
+        node2 = '',
+        value = cent[['bridgeExpectedInfluence']],
         stringsAsFactors = FALSE
       ))
     }

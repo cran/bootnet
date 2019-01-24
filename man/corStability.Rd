@@ -8,8 +8,7 @@ Correlation stability coefficient
 This coefficient denotes the estimated maximum number of cases that can be dropped from the data to retain, with 95\% probability, a correlation of at least 0.7 (default) between statistics based on the original network and statistics computed with less cases. This coefficient should not be below 0.25 and is preferably above 0.5. See also Epskamp, Borsboom and Fried (2016) for more details.
 }
 \usage{
-corStability(x, cor = 0.7, statistics = c("strength", "closeness", "betweenness"), 
-verbose = TRUE)
+corStability(x, cor = 0.7, statistics = "all", verbose = TRUE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -20,7 +19,7 @@ Output of \code{\link{bootnet}}. Must be case-drop bootstrap.
 The correlation level tot est at.
 }
   \item{statistics}{
-The statistic(s) to test for.
+The statistic(s) to test for. Can also be \code{"all"}.
 }
 \item{verbose}{Logical, should information on the progress be printed to the console?}
 }

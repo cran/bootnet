@@ -24,10 +24,10 @@ noDiag <- function(x){
 bootnet <- function(
   data, # Dataset
   nBoots = 1000, # Number of bootstrap samples.
-  default = c("none", "EBICglasso", "ggmModSelect", "pcor","IsingFit","IsingSampler", "huge","adalasso","mgm","relimp","cor","TMFG", "ggmModSelect", "LoGo"), # Default method to use. EBICglasso, IsingFit, concentration, some more....
+  default = c("none", "EBICglasso", "ggmModSelect", "pcor","IsingFit","IsingSampler", "huge","adalasso","mgm","relimp","cor","TMFG", "ggmModSelect", "LoGo","SVAR_lavaan"), # Default method to use. EBICglasso, IsingFit, concentration, some more....
   type = c("nonparametric","parametric","node","person","jackknife","case"), # Bootstrap method to use
   nCores = 1,
-  statistics = c("edge","strength","closeness","betweenness","outStrength","inStrength"),
+  statistics = c("edge","strength","outStrength","inStrength"),
   model = c("detect","GGM","Ising","graphicalVAR"), # Models to use for bootstrap method = parametric. Detect will use the default set and estimation function.
   fun,
   prepFun, # Fun to produce the correlation or covariance matrix
@@ -57,6 +57,11 @@ bootnet <- function(
   weighted,
   signed,
   directed,
+  includeDiagonal = FALSE,
+  communities=NULL,
+  useCommunities="all",
+  library = .libPaths(),
+  memorysaver = TRUE,
   # datatype = c("normal","graphicalVAR"), # Extracted from object or given
   ... # Other arguments
   # edgeResample = FALSE # If true, only resample edges from original estimate
@@ -68,6 +73,16 @@ bootnet <- function(
   # Check default:
   if (default == "graphicalVAR" && !is(data,"bootnetResult")){
     stop("default = 'graphicalVAR' only supported for output of estimateNetwork()")
+  }
+  
+  # Check if statistics is all:
+  if (any(statistics=="all")){
+    statistics <- c("intercept","edge","length","distance","closeness","betweenness","strength","expectedInfluence",
+                    "outStrength","outExpectedInfluence","inStrength","inExpectedInfluence","rspbc","hybrid",
+                    "bridgeStrength", "bridgeCloseness", "bridgeBetweenness",
+                    "bridgeExpectedInfluence")
+  } else {
+    message(paste("Note: bootnet will store only the following statistics: ",paste0(statistics, collapse=", ")))
   }
   
   
@@ -111,6 +126,17 @@ bootnet <- function(
     manual <- FALSE
     
     if (is(data,"bootnetResult")){
+      
+      # Check if thresholded:
+      if (isTRUE(data$thresholded)){
+        stop("Network has already been thresholded using bootstraps.")
+      }
+      
+      # Check if bootInclude:
+      if (isTRUE(data$bootInclude)){
+        stop("Network is based on bootstrap include probabilities.")
+      }
+      
       default <- data$default
       inputCheck <- data$.input
       datatype <- data$datatype
@@ -470,7 +496,7 @@ bootnet <- function(
                           weighted = weighted,
                           signed = signed,
                           .input = inputCheck,
-                          memorysaver = TRUE)
+                          memorysaver = memorysaver)
           
         }))
         if (is(res, "try-error")){
@@ -527,6 +553,8 @@ bootnet <- function(
     
     # Run loop:
     bootResults <- pblapply(seq_len(nBoots), function(b){
+      # Set library:
+      .libPaths(library)
       
       tryLimit <- 10
       tryCount <- 0
@@ -639,7 +667,7 @@ bootnet <- function(
                           weighted = weighted,
                           signed = signed,
                           .input = inputCheck,
-                          memorysaver = TRUE)
+                          memorysaver = memorysaver)
           
         }))
         if (is(res, "try-error")){
@@ -678,7 +706,7 @@ bootnet <- function(
   if (verbose){
     message("Computing statistics...")
   }
-  statTableOrig <- statTable(sampleResult,  name = "sample", alpha = alpha, computeCentrality = computeCentrality,statistics=statistics, directed=directed)
+  statTableOrig <- statTable(sampleResult,  name = "sample", alpha = alpha, computeCentrality = computeCentrality,statistics=statistics, directed=directed, includeDiagonal=includeDiagonal, communities=communities, useCommunities=useCommunities)
   
   if (nCores == 1){
     if (verbose){
@@ -686,7 +714,7 @@ bootnet <- function(
     }
     statTableBoots <- vector("list", nBoots)
     for (b in seq_len(nBoots)){
-      statTableBoots[[b]] <- statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed)
+      statTableBoots[[b]] <- statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed,  communities=communities, useCommunities=useCommunities,includeDiagonal=includeDiagonal)
       if (verbose){
         setTxtProgressBar(pb, b)
       }
@@ -696,7 +724,10 @@ bootnet <- function(
     }
   }  else {
     statTableBoots <- pblapply(seq_len(nBoots),function(b){
-      statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed)
+      # Set library:
+      .libPaths(library)
+      
+      statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed, communities=communities, useCommunities=useCommunities,includeDiagonal=includeDiagonal)
     }, cl = cl)
     # Stop the cluster:
     stopCluster(cl)
