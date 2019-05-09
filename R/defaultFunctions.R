@@ -338,6 +338,7 @@ bootnet_pcor <- function(
   corArgs = list(), # Extra arguments to the correlation function
   threshold = 0,
   alpha = 0.05,
+  adjacency,
   principalDirection = FALSE
 ){
   # Check arguments:
@@ -445,7 +446,20 @@ bootnet_pcor <- function(
   }
   
   # Estimate network:
-  Results <- getWmat(qgraph::qgraph(corMat,graph = "pcor",DoNotPlot = TRUE,threshold=threshold,alpha=alpha, sampleSize = sampleSize))
+  if (missing(adjacency)){
+    Results <- getWmat(qgraph::qgraph(corMat,graph = "pcor",DoNotPlot = TRUE,threshold=threshold,alpha=alpha, sampleSize = sampleSize))    
+  } else {
+    if (is.character(threshold)){
+      stop("Significance thresholding not supported with fixed structure ('adjacency' is not missing). Obtain significance via bootstraps.")
+    }
+    diag(adjacency) <- 1
+    zeroes <- which(adjacency==0,arr.ind=TRUE)
+    glas <- suppressWarnings(glasso::glasso(corMat,rho = 0, zero = zeroes)$wi)
+  
+    Results <- as.matrix(qgraph::wi2net(glas))
+    Results <- 0.5*(Results + t(Results))
+  }
+
   
   # Return:
   return(list(graph=Results,results=Results))
@@ -1449,6 +1463,7 @@ bootnet_SVAR_lavaan <- function(
   tempBlacklist,
   contWhitelist,
   contBlacklist,
+  minimalModInd = 10,
   ...
 ){
   # Warn user:
@@ -1574,52 +1589,70 @@ bootnet_SVAR_lavaan <- function(
   # Criterion:
   curCrit <- fitMeasures(curFit,criterion)
   
-  # Test all options:
-  repeat{
-    testInds <- allModInd[!allModInd %in% curModInd]
-    tests <- lapply(testInds,function(i){
-      testModInds <- c(curModInd,i)
-      curMod <- paste0(allTerms$dep[testModInds], " ~ ",allTerms$indep[testModInds],collapse = '\n')
-      curMod <- paste(curMod,"\n",constraints)
-      
-      # Fit model:
-      testFit <- lavaan::sem(curMod, lavData)
-      
-      # Criterion:
-      testCrit <- fitMeasures(testFit,criterion)
-      
-      return(list(
-        fit = testFit,
-        crit = testCrit
-      ))
-    })
-    
-    # crits:
-    allCrits <- sapply(tests,"[[","crit")
-    
-    if (any(allCrits < curCrit)){
-      # Test for equivalent:
-      if (sum(allCrits < min(allCrits) + eqThreshold) > 1){
-        # Select one at random:
-        bestOptions <- which(allCrits < min(allCrits) + eqThreshold)
-        best <- sample(bestOptions,1)
-        
-        warning("Severeral nearly equivalent best models found. Selecting one at random.")
-        
-      } else {
-        best <- which.min(allCrits)        
-      }
-      
-      
-
-      curModInd <- c(curModInd,testInds[best])
-      curCrit <- tests[[best]]$crit
-      curFit <- tests[[best]]$fit
-    } else {
-      break
-    }
-  }
+  # Mod indices:
+  modInds <- modificationindices(curFit)
+  modInds <- modInds[modInds$op == "~",]
+  modInds <- modInds[order(modInds$mi,decreasing = TRUE),]
+  modInds <- modInds[modInds$mi > minimalModInd,]
   
+  # Test all options:
+  if (nrow(modInds) != 0){
+    repeat{
+      testInds <- allModInd[!allModInd %in% curModInd & allTerms$dep %in% modInds$lhs & allTerms$indep %in% modInds$rhs]
+      tests <- lapply(testInds,function(i){
+        testModInds <- c(curModInd,i)
+        curMod <- paste0(allTerms$dep[testModInds], " ~ ",allTerms$indep[testModInds],collapse = '\n')
+        curMod <- paste(curMod,"\n",constraints)
+        
+        # Fit model:
+        testFit <- lavaan::sem(curMod, lavData)
+        
+        # Criterion:
+        testCrit <- fitMeasures(testFit,criterion)
+        
+        return(list(
+          fit = testFit,
+          crit = testCrit
+        ))
+      })
+      
+      # crits:
+      allCrits <- sapply(tests,"[[","crit")
+      
+      if (any(allCrits < curCrit)){
+        # Test for equivalent:
+        if (sum(allCrits < min(allCrits) + eqThreshold) > 1){
+          # Select one at random:
+          bestOptions <- which(allCrits < min(allCrits) + eqThreshold)
+          best <- sample(bestOptions,1)
+          
+          warning("Severeral nearly equivalent best models found. Selecting one at random.")
+          
+        } else {
+          best <- which.min(allCrits)        
+        }
+        
+        
+        
+        curModInd <- c(curModInd,testInds[best])
+        curCrit <- tests[[best]]$crit
+        curFit <- tests[[best]]$fit
+        
+        modInds <- modificationindices(curFit)
+        modInds <- modInds[modInds$op == "~",]
+        modInds <- modInds[order(modInds$mi,decreasing = TRUE),]
+        modInds <- modInds[modInds$mi > minimalModInd,]
+        
+        if (nrow(modInds) == 0){
+          break
+        }
+      } else {
+        break
+      }
+    }
+    
+  }
+
   # Construct networks:
   pars <- parameterEstimates(curFit)
   nVars <- length(vars)
