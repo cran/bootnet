@@ -16,7 +16,99 @@ principalDirection_noCor <- function(data){
   return(data)
 }
 
-# Folling R:
+
+# Function for sampleSize:
+sampleSize_pairwise <- function(data, type = c( "pairwise_average","maximum","minimum","pairwise_maximum",
+                                               "pairwise_minimum")){
+  type <- match.arg(type)
+  
+  if (type == "maximum"){
+    
+    sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
+    
+  } else if (type == "minimum"){
+    
+    sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
+    
+  } else {
+    # Matrix with NAs:
+    xmat <- as.matrix(!is.na(data))
+    # product:
+    misMatrix <- t(xmat) %*% xmat
+    
+    if (type == "pairwise_maximum"){
+      sampleSize <- max(misMatrix)
+    } else  if (type == "pairwise_minimum"){
+      sampleSize <- min(misMatrix)
+    } else  if (type == "pairwise_average"){
+      sampleSize <- mean(misMatrix)
+    }
+    
+    
+  }
+  
+  
+  return(sampleSize)
+}
+
+# Function for correlation/covariance:
+bootnet_correlate <- function(data, corMethod =  c("cor_auto","cov","cor","npn","spearman"), 
+                              corArgs = list(), missing = c("pairwise","listwise","fiml","stop"),
+                              verbose = TRUE, nonPositiveDefinite = c("stop","continue")){
+  nonPositiveDefinite <- match.arg(nonPositiveDefinite)
+  corMethod <- match.arg(corMethod)
+  missing <- match.arg(missing)
+  
+  # Correlate data:
+  # npn:
+  if (corMethod == "npn"){
+    data <- huge::huge.npn(data)
+    corMethod <- "cor"
+  }
+  
+  # cor_auto:
+  if (corMethod == "cor_auto"){
+    args <- list(data=data,missing=missing,verbose=verbose)
+    if (length(corArgs) > 0){
+      for (i in seq_along(corArgs)){
+        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
+      }
+    }
+    corMat <- do.call(qgraph::cor_auto,args)
+  } else if (corMethod%in%c("cor","cov","spearman")){
+    # Normal correlations
+    if (missing == "fiml"){
+      stop("missing = 'fiml' only supported with corMethod = 'cor_auto'")
+    }
+    use <- switch(missing,
+                  pairwise = "pairwise.complete.obs",
+                  listwise = "complete.obs")
+    
+    args <- list(x=data,use=use)
+    if (length(corArgs) > 0){
+      for (i in seq_along(corArgs)){
+        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
+      }
+    }
+    if (corMethod == "spearman"){
+      args[["method"]] <- "spearman"
+      corMethod <- "cor"
+    }
+    
+    corMat <- do.call(corMethod,args)
+  } else stop ("Correlation method is not supported.")
+  
+  if (nonPositiveDefinite == "stop"){
+    if (!all(eigen(corMat)$values > 0)){
+      stop("Correlation matrix is not positive definite.")
+    }    
+  }
+  
+  return(corMat)
+}
+
+
+# Fooling R:
 mgm <- NULL
 mgmfit <- NULL
 
@@ -87,9 +179,10 @@ bootnet_argEstimator <- function(data, prepFun, prepArgs, estFun, estArgs, graph
 bootnet_EBICglasso <- function(
   data, # Dataset used
   tuning = 0.5, # tuning parameter
-  corMethod = c("cor_auto","cov","cor","npn"), # Correlation method
+  corMethod = c("cor_auto","cov","cor","npn","spearman"), # Correlation method
   missing = c("pairwise","listwise","fiml","stop"),
-  sampleSize = c("maximum","minimim"), # Sample size when using missing = "pairwise"
+  sampleSize = c("pairwise_average","maximum","minimum","pairwise_maximum",
+                 "pairwise_minimum"), # Sample size when using missing = "pairwise"
   verbose = TRUE,
   corArgs = list(), # Extra arguments to the correlation function
   refit = FALSE,
@@ -97,12 +190,19 @@ bootnet_EBICglasso <- function(
   lambda.min.ratio = 0.01,
   nlambda = 100,
   threshold = FALSE,
+  unlock = FALSE,
+  nonPositiveDefinite = c("stop","continue"),
   ...
 ){
+  nonPositiveDefinite <- match.arg(nonPositiveDefinite)
+  if (!unlock){
+  stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+
   # Check arguments:
   corMethod <- match.arg(corMethod)
   missing <- match.arg(missing)
-  sampleSize <- match.arg(sampleSize)
+  # sampleSize <- match.arg(sampleSize)
   
   # Message:
   if (verbose){
@@ -141,49 +241,18 @@ bootnet_EBICglasso <- function(
   }
   
   # Correlate data:
-  # npn:
-  if (corMethod == "npn"){
-    data <- huge::huge.npn(data)
-    corMethod <- "cor"
-  }
+  corMat <- bootnet_correlate(data = data, corMethod =  corMethod, 
+                                corArgs = corArgs, missing = missing,
+                                verbose = verbose,nonPositiveDefinite=nonPositiveDefinite)
   
-  # cor_auto:
-  if (corMethod == "cor_auto"){
-    args <- list(data=data,missing=missing,verbose=verbose)
-    if (length(corArgs) > 0){
-      for (i in seq_along(corArgs)){
-        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
-      }
-    }
-    corMat <- do.call(qgraph::cor_auto,args)
-  } else if (corMethod%in%c("cor","cov")){
-    # Normal correlations
-    if (missing == "fiml"){
-      stop("missing = 'fiml' only supported with corMethod = 'cor_auto'")
-    }
-    use <- switch(missing,
-                  pairwise = "pairwise.complete.obs",
-                  listwise = "complete.obs")
-    
-    args <- list(x=data,use=use)
-    if (length(corArgs) > 0){
-      for (i in seq_along(corArgs)){
-        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
-      }
-    }
-    
-    corMat <- do.call(corMethod,args)
-  } else stop ("Correlation method is not supported.")
+
+
   
   # Sample size:
   if (missing == "listwise"){
     sampleSize <- nrow(na.omit(data))
   } else{
-    if (sampleSize == "maximum"){
-      sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
-    } else {
-      sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
-    }
+    sampleSize <- sampleSize_pairwise(data, sampleSize)
   } 
   
   # Principal direction:
@@ -212,21 +281,29 @@ bootnet_EBICglasso <- function(
 bootnet_ggmModSelect <- function(
   data, # Dataset used
   tuning = 0, # tuning parameter
-  corMethod = c("cor_auto","cov","cor","npn"), # Correlation method
+  corMethod = c("cor_auto","cov","cor","npn","spearman"), # Correlation method
   missing = c("pairwise","listwise","fiml","stop"),
-  sampleSize = c("maximum","minimim"), # Sample size when using missing = "pairwise"
+  sampleSize = c("pairwise_average","maximum","minimum","pairwise_maximum",
+                 "pairwise_minimum"), # Sample size when using missing = "pairwise"
   verbose = TRUE,
   corArgs = list(), # Extra arguments to the correlation function
   principalDirection = FALSE,
   start = c("glasso","empty","full"),
   stepwise = TRUE,
   nCores = 1,
+  unlock = FALSE,
+  nonPositiveDefinite = c("stop","continue"),
   ...
 ){
+  nonPositiveDefinite <- match.arg(nonPositiveDefinite)
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
   # Check arguments:
   corMethod <- match.arg(corMethod)
   missing <- match.arg(missing)
-  sampleSize <- match.arg(sampleSize)
+  # sampleSize <- match.arg(sampleSize)
   
   # Message:
   if (verbose){
@@ -265,49 +342,20 @@ bootnet_ggmModSelect <- function(
   }
   
   # Correlate data:
-  # npn:
-  if (corMethod == "npn"){
-    data <- huge::huge.npn(data)
-    corMethod <- "cor"
-  }
-  
-  # cor_auto:
-  if (corMethod == "cor_auto"){
-    args <- list(data=data,missing=missing,verbose=verbose)
-    if (length(corArgs) > 0){
-      for (i in seq_along(corArgs)){
-        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
-      }
-    }
-    corMat <- do.call(qgraph::cor_auto,args)
-  } else if (corMethod%in%c("cor","cov")){
-    # Normal correlations
-    if (missing == "fiml"){
-      stop("missing = 'fiml' only supported with corMethod = 'cor_auto'")
-    }
-    use <- switch(missing,
-                  pairwise = "pairwise.complete.obs",
-                  listwise = "complete.obs")
-    
-    args <- list(x=data,use=use)
-    if (length(corArgs) > 0){
-      for (i in seq_along(corArgs)){
-        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
-      }
-    }
-    
-    corMat <- do.call(corMethod,args)
-  } else stop ("Correlation method is not supported.")
+  corMat <- bootnet_correlate(data = data, corMethod =  corMethod, 
+                              corArgs = corArgs, missing = missing,
+                              verbose = verbose,nonPositiveDefinite=nonPositiveDefinite)
   
   # Sample size:
   if (missing == "listwise"){
     sampleSize <- nrow(na.omit(data))
   } else{
-    if (sampleSize == "maximum"){
-      sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
-    } else {
-      sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
-    }
+    sampleSize <- sampleSize_pairwise(data, sampleSize)
+    # if (sampleSize == "maximum"){
+    #   sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
+    # } else {
+    #   sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
+    # }
   } 
   
   # Principal direction:
@@ -331,20 +379,29 @@ bootnet_ggmModSelect <- function(
 ### PCOR ESTIMATOR ###
 bootnet_pcor <- function(
   data, # Dataset used
-  corMethod = c("cor_auto","cov","cor","npn"), # Correlation method
+  corMethod = c("cor_auto","cov","cor","npn","spearman"), # Correlation method
   missing = c("pairwise","listwise","fiml","stop"),
-  sampleSize = c("maximum","minimim"), # Sample size when using missing = "pairwise"
+  sampleSize = c("pairwise_average", "maximum","minimum","pairwise_maximum",
+                 "pairwise_minimum"), # Sample size when using missing = "pairwise"
   verbose = TRUE,
   corArgs = list(), # Extra arguments to the correlation function
   threshold = 0,
   alpha = 0.05,
   adjacency,
-  principalDirection = FALSE
+  principalDirection = FALSE,
+  unlock = FALSE,
+  nonPositiveDefinite = c("stop","continue")
 ){
+  nonPositiveDefinite <- match.arg(nonPositiveDefinite)
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Check arguments:
   corMethod <- match.arg(corMethod)
   missing <- match.arg(missing)
-  sampleSize <- match.arg(sampleSize)
+  # sampleSize <- match.arg(sampleSize)
   
   if (identical(threshold,"none")){
     threshold <- 0
@@ -395,49 +452,20 @@ bootnet_pcor <- function(
   }
   
   # Correlate data:
-  # npn:
-  if (corMethod == "npn"){
-    data <- huge::huge.npn(data)
-    corMethod <- "cor"
-  }
-  
-  # cor_auto:
-  if (corMethod == "cor_auto"){
-    args <- list(data=data,missing=missing,verbose=verbose)
-    if (length(corArgs) > 0){
-      for (i in seq_along(corArgs)){
-        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
-      }
-    }
-    corMat <- do.call(qgraph::cor_auto,args)
-  } else if (corMethod%in%c("cor","cov")){
-    # Normal correlations
-    if (missing == "fiml"){
-      stop("missing = 'fiml' only supported with corMethod = 'cor_auto'")
-    }
-    use <- switch(missing,
-                  pairwise = "pairwise.complete.obs",
-                  listwise = "complete.obs")
-    
-    args <- list(x=data,use=use)
-    if (length(corArgs) > 0){
-      for (i in seq_along(corArgs)){
-        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
-      }
-    }
-    
-    corMat <- do.call(corMethod,args)
-  } else stop ("Correlation method is not supported.")
+  corMat <- bootnet_correlate(data = data, corMethod =  corMethod, 
+                              corArgs = corArgs, missing = missing,
+                              verbose = verbose,nonPositiveDefinite=nonPositiveDefinite)
   
   # Sample size:
   if (missing == "listwise"){
     sampleSize <- nrow(na.omit(data))
   } else{
-    if (sampleSize == "maximum"){
-      sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
-    } else {
-      sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
-    }
+    sampleSize <- sampleSize_pairwise(data, sampleSize)
+    # if (sampleSize == "maximum"){
+    #   sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
+    # } else {
+    #   sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
+    # }
   } 
   
   # Principal direction:
@@ -469,19 +497,27 @@ bootnet_pcor <- function(
 ### COR ESTIMATOR ###
 bootnet_cor <- function(
   data, # Dataset used
-  corMethod = c("cor_auto","cov","cor","npn"), # Correlation method
+  corMethod = c("cor_auto","cov","cor","npn","spearman"), # Correlation method
   missing = c("pairwise","listwise","fiml","stop"),
-  sampleSize = c("maximum","minimim"), # Sample size when using missing = "pairwise"
+  sampleSize = c("pairwise_average", "maximum","minimum","pairwise_maximum",
+                 "pairwise_minimum"), # Sample size when using missing = "pairwise"
   verbose = TRUE,
   corArgs = list(), # Extra arguments to the correlation function
   threshold = 0,
   alpha = 0.05,
-  principalDirection = FALSE
+  principalDirection = FALSE,
+  unlock = FALSE,
+  nonPositiveDefinite = c("stop","continue")
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Check arguments:
   corMethod <- match.arg(corMethod)
   missing <- match.arg(missing)
-  sampleSize <- match.arg(sampleSize)
+  # sampleSize <- match.arg(sampleSize)
   
   if (identical(threshold,"none")){
     threshold <- 0
@@ -531,50 +567,20 @@ bootnet_cor <- function(
     }
   }
   
-  # Correlate data:
-  # npn:
-  if (corMethod == "npn"){
-    data <- huge::huge.npn(data)
-    corMethod <- "cor"
-  }
-  
-  # cor_auto:
-  if (corMethod == "cor_auto"){
-    args <- list(data=data,missing=missing,verbose=verbose)
-    if (length(corArgs) > 0){
-      for (i in seq_along(corArgs)){
-        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
-      }
-    }
-    corMat <- do.call(qgraph::cor_auto,args)
-  } else if (corMethod%in%c("cor","cov")){
-    # Normal correlations
-    if (missing == "fiml"){
-      stop("missing = 'fiml' only supported with corMethod = 'cor_auto'")
-    }
-    use <- switch(missing,
-                  pairwise = "pairwise.complete.obs",
-                  listwise = "complete.obs")
-    
-    args <- list(x=data,use=use)
-    if (length(corArgs) > 0){
-      for (i in seq_along(corArgs)){
-        args[[names(corArgs)[[i]]]] <- corArgs[[i]]
-      }
-    }
-    
-    corMat <- do.call(corMethod,args)
-  } else stop ("Correlation method is not supported.")
+  corMat <- bootnet_correlate(data = data, corMethod =  corMethod, 
+                              corArgs = corArgs, missing = missing,
+                              verbose = verbose,nonPositiveDefinite=nonPositiveDefinite)
   
   # Sample size:
   if (missing == "listwise"){
     sampleSize <- nrow(na.omit(data))
   } else{
-    if (sampleSize == "maximum"){
-      sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
-    } else {
-      sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
-    }
+    sampleSize <- sampleSize_pairwise(data, sampleSize)
+    # if (sampleSize == "maximum"){
+    #   sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
+    # } else {
+    #   sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
+    # }
   } 
   
   # Principal direction:
@@ -598,8 +604,14 @@ bootnet_IsingFit <- function(
   verbose = TRUE,
   rule = c("AND","OR"),
   split = "median",
-  principalDirection = FALSE
+  principalDirection = FALSE,
+  unlock = FALSE
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Check arguments:
   missing <- match.arg(missing)
   rule <- match.arg(rule)
@@ -681,8 +693,14 @@ bootnet_IsingSampler <- function(
   verbose = TRUE,
   split = "median",
   method = c("default","ll","pl","uni","bi"),
-  principalDirection = FALSE
+  principalDirection = FALSE,
+  unlock = FALSE
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Check arguments:
   missing <- match.arg(missing)
   method <- match.arg(method)
@@ -776,8 +794,14 @@ bootnet_adalasso <- function(
   missing = c("listwise","stop"),
   verbose = TRUE,
   nFolds = 10, # Number of folds
-  principalDirection = FALSE
+  principalDirection = FALSE,
+  unlock = FALSE
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Check arguments:
   missing <- match.arg(missing)
   
@@ -837,9 +861,15 @@ bootnet_huge <- function(
   criterion = c("ebic","ric","stars"),
   principalDirection = FALSE,
   lambda.min.ratio = 0.01,
-  nlambda = 100
+  nlambda = 100,
+  unlock = FALSE
   # method = c("glasso","mb","ct")
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Check arguments:
   missing <- match.arg(missing)
   criterion <- match.arg(criterion)
@@ -911,9 +941,15 @@ bootnet_mgm <- function(
   order = 2,
   rule = c("AND","OR"),
   binarySign, # Detected by default
+  unlock = FALSE,
   ... # mgm functions
   # method = c("glasso","mb","ct")
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Check arguments:
   missing <- match.arg(missing)
   criterion <- match.arg(criterion)
@@ -1061,8 +1097,14 @@ bootnet_relimp <- function(
   missing = c("listwise","stop"),
   ..., # Arguments sent to the structure function
   verbose = TRUE,
-  threshold = 0
+  threshold = 0,
+  unlock = FALSE
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   nVar <- ncol(data)
   structureDefault <- match.arg(structureDefault)
   
@@ -1182,8 +1224,14 @@ bootnet_TMFG <- function(
   verbose = TRUE,
   corArgs = list(), # Extra arguments to the correlation function
   principalDirection = FALSE,
+  unlock = FALSE,
   ...
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Check arguments:
   corMethod <- match.arg(corMethod)
   missing <- match.arg(missing)
@@ -1292,8 +1340,14 @@ bootnet_LoGo <- function(
   verbose = TRUE,
   corArgs = list(), # Extra arguments to the correlation function
   principalDirection = FALSE,
+  unlock = FALSE,
   ...
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Check arguments:
   corMethod <- match.arg(corMethod)
   missing <- match.arg(missing)
@@ -1391,8 +1445,13 @@ bootnet_graphicalVAR <- function(
   verbose = TRUE,
   principalDirection = FALSE,
   missing =c("listwise","stop"),
+  unlock = FALSE,
   ...
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
   dots <- list(...)
   missing <- match.arg(missing)
   
@@ -1464,8 +1523,14 @@ bootnet_SVAR_lavaan <- function(
   contWhitelist,
   contBlacklist,
   minimalModInd = 10,
+  unlock = FALSE,
   ...
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Warn user:
   if (verbose){
     warning("default = 'SVAR_lavaan' is *experimental*!")
@@ -1700,8 +1765,14 @@ bootnet_piecewiseIsing <- function(
   IsingDefault = c("IsingSampler","IsingFit","custom"),
   zeroThreshold = 1, # Proportion of edges needed to be exactly 0 to set edge to zero
   minimalN = ncol(data) + 1,
+  unlock = FALSE,
   ... # Arguments sent to estimator:
 ){
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  
   # Warn user:
   if (verbose){
     warning("default = 'piecewiseIsing' is *experimental*!")

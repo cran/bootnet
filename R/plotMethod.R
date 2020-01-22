@@ -254,7 +254,7 @@ plot.bootnet <- function(
         return(g)
         
       } else {
-        
+
         Sum <- Sum %>% filter(!is.na(mean))
         if (x$type == "node"){
           g <- ggplot(Sum, aes_string(x = 'nNode', y = meanVar, group = 'type', colour = 'type',ymin = minArea, ymax = maxArea, fill = "type"))         
@@ -281,7 +281,8 @@ plot.bootnet <- function(
             theme_bw() + 
             xlab("Sampled people") + ylab("Average correlation with original sample")+ 
             ylim(-1,1) + geom_hline(yintercept = 0) + 
-            scale_x_reverse(breaks = seq(0.9,0.1,by=-0.1) *  x$sample$nPerson, labels=c(paste0(seq(90,10,by=-10),"%")))
+            scale_x_reverse(breaks = seq(0.9,0.1,by=-0.1) *  x$sample$nPerson, labels=c(paste0(seq(90,10,by=-10),"%")),
+                            limits = c(0.9,0.1) *  x$sample$nPerson)
           
         }
         
@@ -801,7 +802,7 @@ plot.bootnet <- function(
           theme_bw() + 
           xlab("") +
           ylab("") + 
-          scale_y_continuous(breaks = seq(1:length(levels(sumTable$id))), labels = levels(sumTable$id))+ 
+          scale_y_continuous(breaks = seq(1:length(levels(sumTable$id))), labels = levels(sumTable$id), expand = par("pin")[1]/par("pin")[2] * 0.01 * c(1,1))+ 
           scale_color_manual("",values = c(meanColor,sampleColor), labels = c("Bootstrap mean","Sample")) + 
           theme(legend.position = "top")
         # 
