@@ -1,4 +1,4 @@
-ac14a366137ebc3c3013f672589ea24d *DESCRIPTION
+4cc8ca6595b2f73d450dbdf1000aaa34 *DESCRIPTION
 f24eab8fae38a781f3c7a7e279e796e5 *NAMESPACE
 67aa3fe88c9a5fde301db6f6d43bdb26 *NEWS
 d2ead74790439861c6bcda5f470d31f9 *R/Smetric.R
@@ -33,7 +33,7 @@ c72dc3adc4eca0f04fb7c0c5016fd29b *man/bootInclude.Rd
 375219eb78adde6b73d25b6bfac65b10 *man/bootnet.Rd
 0422deeaea6997c80175db87a4b265cb *man/corStability.Rd
 aa349c30bc31dfb01bc85452879ce7f5 *man/differenceTest.Rd
-527f478582ff0e317cfb276ae6dcdf79 *man/estimateNetwork.Rd
+d623e318e9b45417bdc1c7a3cd5a5cca *man/estimateNetwork.Rd
 2a5a27095d88c059c6b704c0e33887c9 *man/genGGM.Rd
 02312aa3e21507188dfb7f954e2763cd *man/ggmGenerator.Rd
 d1591b93b3eb349de6e346192fcaad81 *man/multiverse.Rd
