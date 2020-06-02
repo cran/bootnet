@@ -1,4 +1,4 @@
-4cc8ca6595b2f73d450dbdf1000aaa34 *DESCRIPTION
+ef09e162109dca64737b2564dc894ea8 *DESCRIPTION
 f24eab8fae38a781f3c7a7e279e796e5 *NAMESPACE
 67aa3fe88c9a5fde301db6f6d43bdb26 *NEWS
 d2ead74790439861c6bcda5f470d31f9 *R/Smetric.R
@@ -9,7 +9,7 @@ d464e813841995b83ddf7775e2180657 *R/bootnet.R
 4b67fe2b2a60ac3bef43ffc386771a45 *R/bootnetResultsMethods.R
 d3e64ab3c28e5fc37677426b9f6d4422 *R/centralityCompare.R
 26857d15e837e73dd7cb2adde4785b9b *R/checkInput.R
-ab02d0ca46ce34e6054711d981b39003 *R/comparePlot.R
+55850363e5626d0eacd6166addd73e87 *R/comparePlot.R
 2dd8f620b930355b24fa502646739fb2 *R/defaultFunctions.R
 986f6a7202965210ae7837221f3c4357 *R/estimateNetwork.R
 5eea35bfea1beca726ae4381e39b1282 *R/multiverse.R
