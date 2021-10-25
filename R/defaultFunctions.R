@@ -147,7 +147,7 @@ binarize <- function(x, split = "median", na.rm=TRUE, removeNArows = TRUE, verbo
       splits <- rep(split, length=ncol(x))
     }
     for (i in seq_len(ncol(x))){
-      x[,i] <- 1 * (x[,i] < splits[i])
+      x[,i] <- 1 * (x[,i] >= splits[i])
     }
     
     if (removeNArows){
@@ -515,6 +515,8 @@ bootnet_pcor <- function(
     }
     diag(adjacency) <- 1
     zeroes <- which(adjacency==0,arr.ind=TRUE)
+    
+    if(!requireNamespace("glasso")) stop("'glasso' package needs to be installed.")
     glas <- suppressWarnings(glasso::glasso(corMat,rho = 0, zero = zeroes)$wi)
   
     Results <- as.matrix(qgraph::wi2net(glas))
@@ -918,6 +920,8 @@ bootnet_huge <- function(
   transform = c("none","rank","quantile"),
   ...){
   
+  if(!requireNamespace("huge")) stop("'huge' package needs to be installed.")
+  
   transform <- match.arg(transform)
   if (transform == "rank"){
     data <- rank_transformation(data)
@@ -993,7 +997,7 @@ bootnet_mgm <- function(
   data, # Dataset used
   type,
   level,
-  tuning = 0.5,
+  tuning = 0.25,
   missing = c("listwise","stop"),
   verbose = TRUE,
   criterion = c("EBIC","CV"),
@@ -1171,6 +1175,9 @@ bootnet_relimp <- function(
   unlock = FALSE,
   transform = c("none","rank","quantile")){
   
+  if(!requireNamespace("relaimpo")) stop("'relaimpo' package needs to be installed.")
+  
+  
   transform <- match.arg(transform)
   if (transform == "rank"){
     data <- rank_transformation(data)
@@ -1274,7 +1281,7 @@ bootnet_relimp <- function(
         }
         
       } else {
-        res <- calc.relimp(formula, data, rela = normalized)
+        res <- relaimpo::calc.relimp(formula, data, rela = normalized)
         relimp[-i,i][struc[-i,i]] <- res@lmg              
       }
       
@@ -1368,6 +1375,7 @@ bootnet_TMFG <- function(
   # Correlate data:
   # npn:
   if (corMethod == "npn"){
+    if(!requireNamespace("huge")) stop("'huge' package needs to be installed.")
     data <- huge::huge.npn(data)
     corMethod <- "cor"
   }
@@ -1547,6 +1555,8 @@ bootnet_graphicalVAR <- function(
   transform = c("none","rank","quantile"),
   ...){
   
+  if(!requireNamespace("graphicalVAR")) stop("'graphicalVAR' package needs to be installed.")
+  
   transform <- match.arg(transform)
   if (transform == "rank"){
     data <- rank_transformation(data)
@@ -1633,6 +1643,8 @@ bootnet_SVAR_lavaan <- function(
   unlock = FALSE,
   transform = c("none","rank","quantile"),
   ...){
+  
+  if(!requireNamespace("lavaan")) stop("'lavaan' package needs to be installed.")
   
   transform <- match.arg(transform)
   if (transform == "rank"){
@@ -1768,10 +1780,10 @@ bootnet_SVAR_lavaan <- function(
   curFit <- lavaan::sem(curMod, lavData)
   
   # Criterion:
-  curCrit <- fitMeasures(curFit,criterion)
+  curCrit <- lavaan::fitMeasures(curFit,criterion)
   
   # Mod indices:
-  modInds <- modificationindices(curFit)
+  modInds <- lavaan::modificationindices(curFit)
   modInds <- modInds[modInds$op == "~",]
   modInds <- modInds[order(modInds$mi,decreasing = TRUE),]
   modInds <- modInds[modInds$mi > minimalModInd,]
@@ -1789,7 +1801,7 @@ bootnet_SVAR_lavaan <- function(
         testFit <- lavaan::sem(curMod, lavData)
         
         # Criterion:
-        testCrit <- fitMeasures(testFit,criterion)
+        testCrit <- lavaan::fitMeasures(testFit,criterion)
         
         return(list(
           fit = testFit,
@@ -1819,7 +1831,7 @@ bootnet_SVAR_lavaan <- function(
         curCrit <- tests[[best]]$crit
         curFit <- tests[[best]]$fit
         
-        modInds <- modificationindices(curFit)
+        modInds <- lavaan::modificationindices(curFit)
         modInds <- modInds[modInds$op == "~",]
         modInds <- modInds[order(modInds$mi,decreasing = TRUE),]
         modInds <- modInds[modInds$mi > minimalModInd,]
@@ -1835,7 +1847,7 @@ bootnet_SVAR_lavaan <- function(
   }
 
   # Construct networks:
-  pars <- parameterEstimates(curFit)
+  pars <- lavaan::parameterEstimates(curFit)
   nVars <- length(vars)
   tempNet <- matrix(0,nVars,nVars)
   contNet <- matrix(0,nVars,nVars)
@@ -2073,7 +2085,110 @@ bootnet_piecewiseIsing <- function(
   
 }
 
-
+### GGMncv:
+bootnet_GGMncv <- function(
+  data, # Dataset used
+  penalty = c("atan","selo","exp","log","sica","scad","mcp","lasso"),
+  corMethod = c("cor","cov","cor_auto","npn","spearman"), # Correlation method
+  missing = c("pairwise","listwise","fiml","stop"),
+  sampleSize = c("pairwise_average","maximum","minimum","pairwise_maximum",
+                 "pairwise_minimum"), # Sample size when using missing = "pairwise"
+  verbose = TRUE,
+  corArgs = list(), # Extra arguments to the correlation function
+  principalDirection = FALSE,
+  unlock = FALSE,
+  nonPositiveDefinite = c("stop","continue"),
+  transform = c("none","rank","quantile"),
+  ...){
+  
+  if(!requireNamespace("GGMncv")) stop("'GGMncv' package needs to be installed.")
+  
+  penalty <- match.arg(penalty)
+  
+  transform <- match.arg(transform)
+  if (transform == "rank"){
+    data <- rank_transformation(data)
+  } else if (transform == "quantile"){
+    data <- quantile_transformation(data)
+  }
+  
+  nonPositiveDefinite <- match.arg(nonPositiveDefinite)
+  if (!unlock){
+    stop("You are using an internal estimator function without using 'estimateNetwork'. This function is only intended to be used from within 'estimateNetwork' and will not run now. To force manual use of this function (not recommended), use unlock = TRUE.")  
+  }
+  
+  # Check arguments:
+  corMethod <- match.arg(corMethod)
+  missing <- match.arg(missing)
+  # sampleSize <- match.arg(sampleSize)
+  
+  # Message:
+  if (verbose){
+    msg <- "Estimating Network. Using package::function:"  
+    msg <- paste0(msg,"\n  - GGMncv::ggmncv for model estimation")
+    if (corMethod == "cor_auto"){
+      msg <- paste0(msg,"\n  - qgraph::cor_auto for correlation computation\n    - using lavaan::lavCor")
+    }
+    if (corMethod == "npn"){
+      msg <- paste0(msg,"\n  - huge::huge.npn for nonparanormal transformation")
+    }
+    # msg <- paste0(msg,"\n\nPlease reference accordingly\n")
+    message(msg)
+  }
+  
+  
+  # First test if data is a data frame:
+  if (!(is.data.frame(data) || is.matrix(data))){
+    stop("'data' argument must be a data frame")
+  }
+  
+  # If matrix coerce to data frame:
+  if (is.matrix(data)){
+    data <- as.data.frame(data)
+  }
+  
+  # Obtain info from data:
+  N <- ncol(data)
+  Np <- nrow(data)
+  
+  # Check missing:
+  if (missing == "stop"){
+    if (any(is.na(data))){
+      stop("Missing data detected and missing = 'stop'")
+    }
+  }
+  
+  # Correlate data:
+  corMat <- bootnet_correlate(data = data, corMethod =  corMethod, 
+                              corArgs = corArgs, missing = missing,
+                              verbose = verbose,nonPositiveDefinite=nonPositiveDefinite)
+  
+  # Sample size:
+  if (missing == "listwise"){
+    sampleSize <- nrow(na.omit(data))
+  } else{
+    sampleSize <- sampleSize_pairwise(data, sampleSize)
+    # if (sampleSize == "maximum"){
+    #   sampleSize <- sum(apply(data,1,function(x)!all(is.na(x))))
+    # } else {
+    #   sampleSize <- sum(apply(data,1,function(x)!any(is.na(x))))
+    # }
+  } 
+  
+  # Principal direction:
+  if (principalDirection){
+    corMat <- principalDirection(corMat)
+  }
+  
+  # Estimate network:
+  Results <- GGMncv::ggmncv(corMat,
+                                  n =  sampleSize, 
+                                  penalty = penalty,
+                            progress = verbose,
+                                  ...)
+  # Return:
+  return(list(graph=as.matrix(Results$P),results=Results))
+}
 
 
 

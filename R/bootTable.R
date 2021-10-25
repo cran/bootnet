@@ -7,9 +7,14 @@
 # node2
 # value
 
-statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = c("edge","strength","closeness","betweenness"), directed = FALSE,
-                      communities=NULL,
-                      useCommunities="all", includeDiagonal = FALSE,...){
+statTable <- function(x, 
+                      name, 
+                      alpha = 1, 
+                      computeCentrality = TRUE,
+                      statistics = c("edge","strength","closeness","betweenness"), 
+                      directed = FALSE,
+                      bridgeArgs = list(),
+                      includeDiagonal = FALSE,...){
   # If list, table for every graph!
   if (is.list(x$graph)){
     Tables <- list()
@@ -23,13 +28,14 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     return(dplyr::bind_rows(Tables))
   }
   
+  bridgeCentralityNames <- x[['labels']]
   
   # Statistics can be:
   # Change first letter of statistics to lowercase:
   substr(statistics,0,1) <- tolower(substr(statistics,0,1))
   validStatistics <-  c("intercept","edge","length","distance","closeness","betweenness","strength","expectedInfluence",
-                        "outStrength","outExpectedInfluence","inStrength","inExpectedInfluence","rspbc","hybrid",
-                        "bridgeStrength", "bridgeCloseness", "bridgeBetweenness",
+                        "outStrength","outExpectedInfluence","inStrength","inExpectedInfluence","rspbc","hybrid", "eigenvector",
+                        "bridgeStrength", "bridgeCloseness", "bridgeBetweenness","bridgeInDegree","bridgeOutDegree",
                         "bridgeExpectedInfluence")
   if (!all(statistics %in% validStatistics)){
     stop(paste0("'statistics' must be one of: ",paste0("'",validStatistics,"'",collapse=", ")))
@@ -63,7 +69,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
   Wmat <- qgraph::getWmat(x)
   
   if ("edge" %in% statistics){
-    tables$edges <- dplyr::tbl_df(data.frame(
+    tables$edges <- tibble::as_tibble(data.frame(
       name = name,
       type = "edge",
       node1 = x[['labels']][ind[,1]],
@@ -75,7 +81,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
   
   
   if ("length" %in% statistics){ 
-    tables$length <- dplyr::tbl_df(data.frame(
+    tables$length <- tibble::as_tibble(data.frame(
       name = name,
       type = "length",
       node1 = x[['labels']][ind[,1]],
@@ -87,7 +93,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
   
   # Intercepts:
   if (!is.null(x[['intercepts']])){
-    tables$intercepts <- dplyr::tbl_df(data.frame(
+    tables$intercepts <- tibble::as_tibble(data.frame(
       name = name,
       type = "intercept",
       node1 = x[['labels']],
@@ -117,29 +123,51 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
         bridgeBetweenness= rep(0,ncol(x[['graph']])),
         bridgeExpectedInfluence= rep(0,ncol(x[['graph']]))
       )
+      bridgeCentralityNames <- x[['labels']]
     } else {
       cent <- qgraph::centrality(Wmat, alpha = alpha, all.shortest.paths = FALSE)
       # EI <- expectedInf(Wmat, step="1")
       # names(EI) <- "expectedInfluence"
-      bridgecen <- c("bridgeStrength", "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")
+      bridgecen <- c("bridgeInDegree","bridgeOutDegree","bridgeStrength", "bridgeBetweenness", "bridgeCloseness", "bridgeExpectedInfluence")
       if(any(bridgecen %in% statistics)){
-        if(is.null(communities)){
+        bridgeArgs <- c(list(network=Wmat), bridgeArgs)
+        if(is.null(bridgeArgs$communities)){
           warning("If bridge statistics are to be bootstrapped, the communities argument should be provided")
-          b <-  networktools::bridge(Wmat,...)
-          names(b) <- c(bridgecen, "bridgeExpectedInfluence2step","communities")
-        } else {
-          b <- networktools::bridge(Wmat, communities=communities, useCommunities=useCommunities)
-          names(b) <- c(bridgecen, "bridgeExpectedInfluence2step","communities")
+        } 
+        
+        b <- do.call(networktools::bridge, args=bridgeArgs)
+        
+        # Rename:
+        rename <- function(x,from,to){
+          if (from %in% x){
+            x[x==from] <- to
+          }
+          x
         }
+        names(b) <- rename(names(b), "Bridge Indegree", "bridgeInDegree")
+        names(b) <- rename(names(b), "Bridge Outdegree", "bridgeOutDegree")
+        names(b) <- rename(names(b), "Bridge Strength", "bridgeStrength")
+        names(b) <- rename(names(b), "Bridge Betweenness", "bridgeBetweenness")
+        names(b) <- rename(names(b), "Bridge Closeness", "bridgeCloseness")
+        names(b) <- rename(names(b), "Bridge Expected Influence (1-step)", "bridgeExpectedInfluence")
+        names(b) <- rename(names(b), "Bridge Expected Influence (2-step)", "bridgeExpectedInfluence2step")
+
+        b$communities <- NULL
       } else {
         b <- NULL
+      }
+      if(!is.null(bridgeArgs$useCommunities) && bridgeArgs$useCommunities[1] != "all"){
+        b <- lapply(b, function(cen){cen[bridgeArgs$communities %in% bridgeArgs$useCommunities]})
+        bridgeCentralityNames <- x[['labels']][bridgeArgs$communities %in% bridgeArgs$useCommunities]
+      } else {
+        bridgeCentralityNames <- x[['labels']]
       }
       cent <- c(cent, b)
     }
     
     # strength:
     if ("strength" %in% statistics & !directed){
-      tables$strength <- dplyr::tbl_df(data.frame(
+      tables$strength <- tibble::as_tibble(data.frame(
         name = name,
         type = "strength",
         node1 = x[['labels']],
@@ -150,7 +178,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     }
     
     if ("outStrength" %in% statistics && directed){
-      tables$outStrength <- dplyr::tbl_df(data.frame(
+      tables$outStrength <- tibble::as_tibble(data.frame(
         name = name,
         type = "outStrength",
         node1 = x[['labels']],
@@ -161,7 +189,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     }
     if ("inStrength" %in% statistics && directed){
       
-      tables$inStrength <- dplyr::tbl_df(data.frame(
+      tables$inStrength <- tibble::as_tibble(data.frame(
         name = name,
         type = "inStrength",
         node1 = x[['labels']],
@@ -173,7 +201,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     
     # closeness:
     if ("closeness" %in% statistics){
-      tables$closeness <- dplyr::tbl_df(data.frame(
+      tables$closeness <- tibble::as_tibble(data.frame(
         name = name,
         type = "closeness",
         node1 = x[['labels']],
@@ -186,7 +214,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     
     # betweenness:
     if ("betweenness" %in% statistics){
-      tables$betweenness <- dplyr::tbl_df(data.frame(
+      tables$betweenness <- tibble::as_tibble(data.frame(
         name = name,
         type = "betweenness",
         node1 = x[['labels']],
@@ -197,7 +225,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     }
     
     if ("distance" %in% statistics){
-      tables$sp <- dplyr::tbl_df(data.frame(
+      tables$sp <- tibble::as_tibble(data.frame(
         name = name,
         type = "distance",
         node1 = x[['labels']][ind[,1]],
@@ -208,7 +236,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     }
     
     if ("expectedInfluence" %in% statistics && !directed){
-      tables$expectedInfluence <- dplyr::tbl_df(data.frame(
+      tables$expectedInfluence <- tibble::as_tibble(data.frame(
         name = name,
         type = "expectedInfluence",
         node1 = x[['labels']],
@@ -221,7 +249,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     # randomized shortest paths betweenness centrality:
     if ("rspbc" %in% statistics){
       tryrspbc <- try({
-        tables$rspbc <- dplyr::tbl_df(data.frame(
+        tables$rspbc <- tibble::as_tibble(data.frame(
           name = name,
           type = "rspbc",
           node1 = x[['labels']],
@@ -232,7 +260,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
       })
       
       if (is(tryrspbc,"try-error")){
-        tables$rspbc <- dplyr::tbl_df(data.frame(
+        tables$rspbc <- tibble::as_tibble(data.frame(
           name = name,
           type = "rspbc",
           node1 = x[['labels']],
@@ -247,7 +275,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     if ("hybrid" %in% statistics){
       
       tryhybrid <- try({
-        tables$hybrid <- dplyr::tbl_df(data.frame(
+        tables$hybrid <- tibble::as_tibble(data.frame(
           name = name,
           type = "hybrid",
           node1 = x[['labels']],
@@ -258,7 +286,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
       })
       
       if (is(tryhybrid,"try-error")){
-        tables$rspbc <- dplyr::tbl_df(data.frame(
+        tables$rspbc <- tibble::as_tibble(data.frame(
           name = name,
           type = "hybrid",
           node1 = x[['labels']],
@@ -270,9 +298,36 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
       
     }
     
+    # eigenvector:
+    if ("eigenvector" %in% statistics){
+      
+      tryeigenvector <- try({
+        tables$eigenvector <- tibble::as_tibble(data.frame(
+          name = name,
+          type = "eigenvector",
+          node1 = x[['labels']],
+          node2 = '',
+          value = as.vector(NetworkToolbox::eigenvector(Wmat)),
+          stringsAsFactors = FALSE
+        ))
+      })
+      
+      if (is(tryeigenvector,"try-error")){
+        tables$eigenvector <- tibble::as_tibble(data.frame(
+          name = name,
+          type = "eigenvector",
+          node1 = x[['labels']],
+          node2 = '',
+          value = NA,
+          stringsAsFactors = FALSE
+        ))
+      }
+      
+    }
+    
     if ("outExpectedInfluence" %in% statistics && directed){
       
-      tables$outExpectedInfluence <- dplyr::tbl_df(data.frame(
+      tables$outExpectedInfluence <- tibble::as_tibble(data.frame(
         name = name,
         type = "outExpectedInfluence",
         node1 = x[['labels']],
@@ -283,7 +338,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     }
     if ("inExpectedInfluence" %in% statistics && directed){
       
-      tables$inExpectedInfluence <- dplyr::tbl_df(data.frame(
+      tables$inExpectedInfluence <- tibble::as_tibble(data.frame(
         name = name,
         type = "inExpectedInfluence",
         node1 = x[['labels']],
@@ -296,10 +351,10 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     
     # bridgeStrength:
     if ("bridgeStrength" %in% statistics){
-      tables$bridgeStrength <- dplyr::tbl_df(data.frame(
+      tables$bridgeStrength <- tibble::as_tibble(data.frame(
         name = name,
         type = "bridgeStrength",
-        node1 = x[['labels']],
+        node1 = bridgeCentralityNames,
         node2 = '',
         value = cent[['bridgeStrength']],
         stringsAsFactors = FALSE
@@ -308,10 +363,10 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     
     # bridgeCloseness:
     if ("bridgeCloseness" %in% statistics){
-      tables$bridgeCloseness <- dplyr::tbl_df(data.frame(
+      tables$bridgeCloseness <- tibble::as_tibble(data.frame(
         name = name,
         type = "bridgeCloseness",
-        node1 = x[['labels']],
+        node1 = bridgeCentralityNames,
         node2 = '',
         value = cent[['bridgeCloseness']],
         stringsAsFactors = FALSE
@@ -320,10 +375,10 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     
     # bridgeBetweenness:
     if ("bridgeBetweenness" %in% statistics){
-      tables$bridgeBetweenness <- dplyr::tbl_df(data.frame(
+      tables$bridgeBetweenness <- tibble::as_tibble(data.frame(
         name = name,
         type = "bridgeBetweenness",
-        node1 = x[['labels']],
+        node1 = bridgeCentralityNames,
         node2 = '',
         value = cent[['bridgeBetweenness']],
         stringsAsFactors = FALSE
@@ -332,10 +387,10 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
     
     # bridgeExpectedInfluence:
     if ("bridgeExpectedInfluence" %in% statistics){
-      tables$bridgeExpectedInfluence <- dplyr::tbl_df(data.frame(
+      tables$bridgeExpectedInfluence <- tibble::as_tibble(data.frame(
         name = name,
         type = "bridgeExpectedInfluence",
-        node1 = x[['labels']],
+        node1 = bridgeCentralityNames,
         node2 = '',
         value = cent[['bridgeExpectedInfluence']],
         stringsAsFactors = FALSE
@@ -356,7 +411,7 @@ statTable <- function(x, name, alpha = 1, computeCentrality = TRUE,statistics = 
   tab$nPerson <- x$nPerson
   
   # Compute rank:
-  tab <- tab %>% group_by(type) %>%
+  tab <- tab %>% group_by(.data[['type']]) %>%
     mutate(rank_avg = rank(value,ties.method = "average"),
            rank_min = rank(value,ties.method = "min"),
            rank_max = rank(value,ties.method = "max"))

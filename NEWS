@@ -1,3 +1,22 @@
+Changes in Version 1.5
+  - Fixed a bug with bridge centrality indices being incorrectly labeled
+  - Fixed a bug with that occured when using order = "sample" together with the subset argument
+  - Removed calls to deprecated dplyr functions
+
+Changes in Version 1.4.7
+  - 'binarize' now makes values above the split 1 instead of below the split
+  - The bootnet plot method now shows values for all centrality metrics when plotting difference tests.
+  - the mgm default for tuning now defaults to 0.25
+  - Fixed a bug with bridge centrality indices being incorrectly labeled
+
+Changes in Version 1.4.6
+  - bootnet() now no longer re-estimates the network if the input is a bootnetResult
+  - Several packages are now listed under Suggests instead of Imports
+  - Included support for the GGMncv package
+
+Changes in Version 1.4.4
+  - Fixed a critical error when using multiple cores in R 4.0 on Mac
+
 Changes in Version 1.4
   - Added the transformation functions 'quantile_transformation' and 'rank_transformation'
   - Several default sets now use corMethod = "cor" rather than corMethod = "cor_auto" by default!

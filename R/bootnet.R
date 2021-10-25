@@ -24,7 +24,7 @@ noDiag <- function(x){
 bootnet <- function(
   data, # Dataset
   nBoots = 1000, # Number of bootstrap samples.
-  default = c("none", "EBICglasso", "ggmModSelect", "pcor","IsingFit","IsingSampler", "huge","adalasso","mgm","relimp","cor","TMFG", "ggmModSelect", "LoGo","SVAR_lavaan"), # Default method to use. EBICglasso, IsingFit, concentration, some more....
+  default = c("none", "EBICglasso", "ggmModSelect", "pcor","IsingFit","IsingSampler", "huge","adalasso","mgm","relimp","cor","TMFG", "ggmModSelect", "LoGo","SVAR_lavaan","GGMncv"), # Default method to use. EBICglasso, IsingFit, concentration, some more....
   type = c("nonparametric","parametric","node","person","jackknife","case"), # Bootstrap method to use
   nCores = 1,
   statistics = c("edge","strength","outStrength","inStrength"),
@@ -58,8 +58,9 @@ bootnet <- function(
   signed,
   directed,
   includeDiagonal = FALSE,
-  communities=NULL,
-  useCommunities="all",
+  communities,
+  useCommunities,
+  bridgeArgs=list(),
   library = .libPaths(),
   memorysaver = TRUE,
   # datatype = c("normal","graphicalVAR"), # Extracted from object or given
@@ -78,13 +79,34 @@ bootnet <- function(
   
   # Check if statistics is all:
   if (any(statistics=="all")){
-    statistics <- c("intercept","edge","length","distance","closeness","betweenness","strength","expectedInfluence",
-                    "outStrength","outExpectedInfluence","inStrength","inExpectedInfluence","rspbc","hybrid",
-                    "bridgeStrength", "bridgeCloseness", "bridgeBetweenness",
-                    "bridgeExpectedInfluence")
+    if (missing(communities)){
+      statistics <- c("intercept","edge","length","distance","closeness","betweenness","strength","expectedInfluence",
+                      "outStrength","outExpectedInfluence","inStrength","inExpectedInfluence","rspbc","hybrid", "eigenvector")      
+    } else {
+      statistics <- c("intercept","edge","length","distance","closeness","betweenness","strength","expectedInfluence",
+                      "outStrength","outExpectedInfluence","inStrength","inExpectedInfluence","rspbc","hybrid", "eigenvector",
+                      "bridgeStrength", "bridgeCloseness", "bridgeBetweenness","bridgeInDegree","bridgeOutDegree",
+                      "bridgeExpectedInfluence")
+    }
+
   } else {
     message(paste("Note: bootnet will store only the following statistics: ",paste0(statistics, collapse=", ")))
   }
+  
+  # Check bridgeArgs:
+  if (!missing(communities)){
+    bridgeArgs$communities <- communities
+  } else {
+    bridgeArgs$communities <- communities <- NULL
+  }
+  if (!missing(useCommunities)){
+    bridgeArgs$useCommunities <- useCommunities
+  } else {
+    bridgeArgs$useCommunities <- useCommunities <- "all"
+  }
+  
+  # Set a NULL sampleResult:
+  sampleResult <- NULL
   
   
   type <- match.arg(type)
@@ -138,6 +160,8 @@ bootnet <- function(
       if (isTRUE(data$bootInclude)){
         stop("Network is based on bootstrap include probabilities.")
       }
+      
+      sampleResult <- data
       
       default <- data$default
       inputCheck <- data$.input
@@ -324,20 +348,25 @@ bootnet <- function(
   
   if (!manual)
   {
-    if (verbose){
-      message("Estimating sample network...")
+
+    
+    if (is.null(sampleResult)){
+      if (verbose){
+        message("Estimating sample network...")
+      }
+      
+      sampleResult <- estimateNetwork(data, 
+                                      default = default,
+                                      fun = inputCheck$estimator,
+                                      .dots = inputCheck$arguments,
+                                      labels = labels,
+                                      verbose = verbose,
+                                      weighted = weighted,
+                                      signed = signed,
+                                      .input = inputCheck,
+                                      datatype = datatype)
     }
     
-    sampleResult <- estimateNetwork(data, 
-                                    default = default,
-                                    fun = inputCheck$estimator,
-                                    .dots = inputCheck$arguments,
-                                    labels = labels,
-                                    verbose = verbose,
-                                    weighted = weighted,
-                                    signed = signed,
-                                    .input = inputCheck,
-                                    datatype = datatype)
     
     
   } else {
@@ -453,7 +482,12 @@ bootnet <- function(
           
         } else {
           # Personwise:
-          nPerson <- sample(subCases,1)
+          if (length(subCases) == 1){
+            nPerson <- subCases
+          } else {
+            nPerson <- sample(subCases,1)  
+          }
+          
           inSample <- 1:N
           persSample <- sort(sample(seq_len(Np),nPerson))
           if (datatype == "normal"){
@@ -529,8 +563,14 @@ bootnet <- function(
     if (verbose){
       message("Bootstrapping...")
     }
+
+    if (Sys.getenv("RSTUDIO") == "1" && !nzchar(Sys.getenv("RSTUDIO_TERM")) && 
+        Sys.info()["sysname"] == "Darwin" && gsub("\\..*","",getRversion()) == "4") {
+      snow::setDefaultClusterOptions(setup_strategy = "sequential")
+    }
+    
     nClust <- nCores - 1
-    cl <- makePSOCKcluster(nClust)
+    cl <- snow::makeSOCKcluster(nClust)
     
     # IF graph or data is missing, dummy graph:
     if (missing(graph)){
@@ -624,7 +664,11 @@ bootnet <- function(
           
         } else {
           # Personwise:
-          nPerson <- sample(subCases,1)
+          if (length(subCases) == 1){
+            nPerson <- subCases
+          } else {
+            nPerson <- sample(subCases,1)  
+          }
           inSample <- 1:N
           persSample <- sort(sample(seq_len(Np),nPerson))
           if (datatype == "normal"){
@@ -709,7 +753,7 @@ bootnet <- function(
   if (verbose){
     message("Computing statistics...")
   }
-  statTableOrig <- statTable(sampleResult,  name = "sample", alpha = alpha, computeCentrality = computeCentrality,statistics=statistics, directed=directed, includeDiagonal=includeDiagonal, communities=communities, useCommunities=useCommunities)
+  statTableOrig <- statTable(sampleResult,  name = "sample", alpha = alpha, computeCentrality = computeCentrality,statistics=statistics, directed=directed, includeDiagonal=includeDiagonal, bridgeArgs=bridgeArgs)
   
   if (nCores == 1){
     if (verbose){
@@ -717,7 +761,7 @@ bootnet <- function(
     }
     statTableBoots <- vector("list", nBoots)
     for (b in seq_len(nBoots)){
-      statTableBoots[[b]] <- statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed,  communities=communities, useCommunities=useCommunities,includeDiagonal=includeDiagonal)
+      statTableBoots[[b]] <- statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed,  bridgeArgs=bridgeArgs, includeDiagonal=includeDiagonal)
       if (verbose){
         setTxtProgressBar(pb, b)
       }
@@ -730,7 +774,7 @@ bootnet <- function(
       # Set library:
       .libPaths(library)
       
-      statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed, communities=communities, useCommunities=useCommunities,includeDiagonal=includeDiagonal)
+      statTable(bootResults[[b]], name = paste("boot",b), alpha = alpha, computeCentrality = computeCentrality, statistics=statistics, directed=directed, bridgeArgs=bridgeArgs, includeDiagonal=includeDiagonal)
     }, cl = cl)
     # Stop the cluster:
     stopCluster(cl)

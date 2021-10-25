@@ -11,19 +11,19 @@ This function can be used to bootstrap network estimation methods so that the sp
 bootnet(data, nBoots = 1000, default = c("none", "EBICglasso",
                  "ggmModSelect", "pcor", "IsingFit", "IsingSampler",
                  "huge", "adalasso", "mgm", "relimp", "cor", "TMFG",
-                 "ggmModSelect", "LoGo", "SVAR_lavaan"), type =
-                 c("nonparametric", "parametric", "node", "person",
+                 "ggmModSelect", "LoGo", "SVAR_lavaan", "GGMncv"), type
+                 = c("nonparametric", "parametric", "node", "person",
                  "jackknife", "case"), nCores = 1, statistics =
-                 c("edge", "strength", "outStrength", "inStrength"), 
-                 model = c("detect", "GGM", "Ising", "graphicalVAR"), 
-                 fun, verbose = TRUE, labels, alpha =
-                 1, caseMin = 0.05, caseMax = 0.75, caseN = 10,
-                 subNodes, subCases, computeCentrality = TRUE, propBoot
-                 = 1, replacement = TRUE, graph, sampleSize,
-                 intercepts, weighted, signed, directed,
-                 includeDiagonal = FALSE, communities = NULL,
-                 useCommunities = "all", library = .libPaths(),
-                 memorysaver = TRUE, ...)
+                 c("edge", "strength", "outStrength", "inStrength"),
+                 model = c("detect", "GGM", "Ising", "graphicalVAR"),
+                 fun, verbose = TRUE, labels, alpha = 1, caseMin =
+                 0.05, caseMax = 0.75, caseN = 10, subNodes, subCases,
+                 computeCentrality = TRUE, propBoot = 1, replacement =
+                 TRUE, graph, sampleSize, intercepts, weighted, signed,
+                 directed, includeDiagonal = FALSE, communities,
+                 useCommunities, bridgeArgs = list(), library =
+                 .libPaths(), memorysaver = TRUE, ...)
+
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -52,11 +52,14 @@ Vector indicating which statistics to store. Options are:
 \item{\code{"expectedInfluence"}}{Expected Influence}
 \item{\code{"outExpectedInfluence"}}{Outgoing expected influence}
 \item{\code{"inExpectedInfluence"}}{Incoming expected influence}
+\item{\code{"bridgeInDegree"}}{Bridge in-degree (see \code{\link[networktools]{bridge}})}
+\item{\code{"bridgeOutnDegree"}}{Bridge out-degree (see \code{\link[networktools]{bridge}})}
 \item{\code{"bridgeStrength"}}{Bridge-strength (see \code{\link[networktools]{bridge}})}
 \item{\code{"bridgeCloseness"}}{Bridge-closeness (see \code{\link[networktools]{bridge}})}
 \item{\code{"bridgeBetweenness"}}{Bridge-betweenness (see \code{\link[networktools]{bridge}})}
 \item{\code{"rspbc"}}{Randomized shortest paths betweenness centrality (see \code{\link[NetworkToolbox]{rspbc}})}
 \item{\code{"hybrid"}}{Hybrid centrality (see \code{\link[NetworkToolbox]{hybrid}})}
+\item{\code{"eigenvector"}}{Eigenvector centrality (see \code{\link[NetworkToolbox]{eigenvector}})}
 }
 Can contain \code{"edge"}, \code{"strength"}, \code{"closeness"}, \code{"betweenness"}, \code{"length"}, \code{"distance"}, \code{"expectedInfluence"}, \code{"inExpectedInfluence"}, \code{"outExpectedInfluence"}. By default, length and distance are not stored.
 }
@@ -111,6 +114,9 @@ Library location to be used in parallel computing.
 }
 \item{memorysaver}{
 Logical. If TRUE (recommended) then raw bootstrapped data and results are not stored in the output object. This saves a lot of memory. Set this only to TRUE if you need the raw results or bootstrap data.}
+\item{bridgeArgs}{
+List of arguments used in the 'bridge' function for computing bridge centrality
+}
 \item{\dots}{
   Additional arguments used in the estimator function.
 }
@@ -146,7 +152,7 @@ Network <- estimateNetwork(bfiSub, default = "EBICglasso")
 library("qgraph")
 centralityPlot(Network)
 
-\dontrun{
+\donttest{
 # Estimated network:
 plot(Network, layout = 'spring') 
 
@@ -165,7 +171,7 @@ plot(Results1, "edge", plot = "difference",onlyNonZero = TRUE,
 plot(Results1, "strength", plot = "difference")
 
 # Test for difference in strength between node "A1" and "C2":
-differenceTest(Results,  "A1", "C2", "strength")
+differenceTest(Results1,  "A1", "C2", "strength")
 
 ### Case-drop bootstrap ###
 # Bootstrap 1000 values, using 8 cores:
