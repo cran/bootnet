@@ -1,7 +1,7 @@
 Package: bootnet
 Type: Package
 Title: Bootstrap Methods for Various Network Estimation Routines
-Version: 1.5
+Version: 1.5.1
 Authors@R: c(
   person("Sacha", "Epskamp", email = "mail@sachaepskamp.com",role = c("aut", "cre")),
   person("Eiko I.", "Fried", role = c("ctb"))
@@ -11,7 +11,7 @@ Depends: ggplot2, R (>= 3.0.0)
 Imports: methods, igraph, IsingFit, qgraph, dplyr (>= 0.3.0.2), tidyr,
         gtools, corpcor, IsingSampler, mvtnorm, abind, Matrix, snow,
         mgm (>= 1.2), NetworkToolbox (>= 1.1.0), pbapply, networktools,
-        rlang, tibble
+        rlang, tibble, tidyselect
 Suggests: glasso, GGMncv, BDgraph, graphicalVAR, relaimpo, lavaan,
         psychTools, huge
 Description: Bootstrap methods to assess accuracy and stability of estimated network structures
@@ -20,8 +20,8 @@ Description: Bootstrap methods to assess accuracy and stability of estimated net
               default sets for various estimation routines.
 License: GPL-2
 NeedsCompilation: no
-Packaged: 2021-10-25 14:38:34 UTC; sacha
+Packaged: 2023-05-16 11:18:12 UTC; sachaepskamp
 Author: Sacha Epskamp [aut, cre],
   Eiko I. Fried [ctb]
 Repository: CRAN
-Date/Publication: 2021-10-25 16:20:09 UTC
+Date/Publication: 2023-05-16 11:50:02 UTC
