@@ -1,11 +1,11 @@
-94b42792466d6fc9ef6b4f6862fee815 *DESCRIPTION
+26193f474249100383e99583d4879625 *DESCRIPTION
 4f92e8bba882c717c32c877394aecc68 *NAMESPACE
-56a50e42995e374463c3256e437d1e92 *NEWS
+0860e8cf5274571563a422b29fecb1f3 *NEWS
 31440d51325f2bdd5938b98c5471dfba *R/Smetric.R
 e6ff392c5cf818d3f85ee482e06fc10d *R/bootInclude.R
-d3400ad0caca89379a64c141bd31bd63 *R/bootTable.R
+6da6be1affeb9ee241f79b9c11f36d9f *R/bootTable.R
 ee2c4b0ce0ff48b06ecfae52297a5a66 *R/bootThreshold.R
-48ca23193ce1a1d9f8eb913378e278ac *R/bootnet.R
+c0deb7b32adf4c04e6e538de8d6178f5 *R/bootnet.R
 a0787d7fa8e881e15ca0be96700afaa2 *R/bootnetResultsMethods.R
 7ea565a70c328df0c4b94eaadc5de815 *R/centralityCompare.R
 2c52ee19510508f9ef7a21e7a9368ef1 *R/checkInput.R
@@ -16,7 +16,7 @@ a59feeb9147a83835cd3786a15199f5f *R/multiverse.R
 00c95d972a5a95fb0a05c2661074a231 *R/netSimulator.R
 94c17bd8c4f7813e5dc8cff06da533fc *R/netSimulator_methods.R
 71587cbe3241da56a1da665558534145 *R/parSim.R
-e5fd7d71d6853c11c574891f4b4fd1f5 *R/plotMethod.R
+fc8e47ec18da27ee7621bd900eee6add *R/plotMethod.R
 5bb349a6bf860fab2d0b0e90db9b5ffb *R/printMethod.R
 d0ae2d76cd19023bacd138cf12757f19 *R/replicationSimulator.R
 2cf9eaf34e8baa2f7b8addc57dfe8483 *R/replicationSimulator_methods.R
@@ -24,7 +24,7 @@ d0ae2d76cd19023bacd138cf12757f19 *R/replicationSimulator.R
 d909eecce5ba3d78991e699fbf37113e *R/summaryMethod.R
 e2f70827fe17604c60e6e69ccd0f61f6 *R/transformations.R
 322651b05bb536a2d52dada3d1289f93 *R/zzz.R
-38cdd6019d68eea760d85693d1ac4046 *README.md
+b8af479e0c358907d144180ab999e2a4 *README.md
 cd89f78299183d5e85c27b6a20bf9d48 *inst/CITATION
 709e28bb5300830bfaf022c4cf8c26dd *man/IsingGenerator.Rd
 041cd598e4837ae1295569b15df27db8 *man/binarize.Rd

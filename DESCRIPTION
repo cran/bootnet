@@ -1,7 +1,7 @@
 Package: bootnet
 Type: Package
 Title: Bootstrap Methods for Various Network Estimation Routines
-Version: 1.5.1
+Version: 1.5.3
 Authors@R: c(
   person("Sacha", "Epskamp", email = "mail@sachaepskamp.com",role = c("aut", "cre")),
   person("Eiko I.", "Fried", role = c("ctb"))
@@ -20,8 +20,8 @@ Description: Bootstrap methods to assess accuracy and stability of estimated net
               default sets for various estimation routines.
 License: GPL-2
 NeedsCompilation: no
-Packaged: 2023-05-16 11:18:12 UTC; sachaepskamp
+Packaged: 2023-06-02 03:16:49 UTC; sachaepskamp
 Author: Sacha Epskamp [aut, cre],
   Eiko I. Fried [ctb]
 Repository: CRAN
-Date/Publication: 2023-05-16 11:50:02 UTC
+Date/Publication: 2023-06-05 12:30:02 UTC
