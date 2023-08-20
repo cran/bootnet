@@ -1,6 +1,5 @@
-\name{anRpackage-package}
-\alias{anRpackage-package}
-\alias{anRpackage}
+\name{bootnet-package}
+ \alias{bootnet-package}
 \docType{package}
 \title{
 Bootstrap Methods for Various Network Estimation Routines

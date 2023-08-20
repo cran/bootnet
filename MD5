@@ -1,6 +1,6 @@
-26193f474249100383e99583d4879625 *DESCRIPTION
+029b8b925fc8c11fba660936f9de9e45 *DESCRIPTION
 4f92e8bba882c717c32c877394aecc68 *NAMESPACE
-0860e8cf5274571563a422b29fecb1f3 *NEWS
+33037ce493747a35865ec9452e49a068 *NEWS
 31440d51325f2bdd5938b98c5471dfba *R/Smetric.R
 e6ff392c5cf818d3f85ee482e06fc10d *R/bootInclude.R
 6da6be1affeb9ee241f79b9c11f36d9f *R/bootTable.R
@@ -10,7 +10,7 @@ a0787d7fa8e881e15ca0be96700afaa2 *R/bootnetResultsMethods.R
 7ea565a70c328df0c4b94eaadc5de815 *R/centralityCompare.R
 2c52ee19510508f9ef7a21e7a9368ef1 *R/checkInput.R
 d41d8cd98f00b204e9800998ecf8427e *R/comparePlot.R
-508f12d4a22cdc1e8d62a3255e327882 *R/defaultFunctions.R
+92153c9f9bf4afeaadb6d5542f6503e9 *R/defaultFunctions.R
 1507958a1246970ab6354a0edaca75d7 *R/estimateNetwork.R
 a59feeb9147a83835cd3786a15199f5f *R/multiverse.R
 00c95d972a5a95fb0a05c2661074a231 *R/netSimulator.R
@@ -30,11 +30,11 @@ cd89f78299183d5e85c27b6a20bf9d48 *inst/CITATION
 041cd598e4837ae1295569b15df27db8 *man/binarize.Rd
 2ab1119e6598bee5af85465b36725036 *man/bootInclude.Rd
 0c811b9ea27ddca5a6974236c5d33d87 *man/bootThreshold.Rd
-6f004570656e2b595157dad1ed06f36b *man/bootnet-package.Rd
+d344f76944bfe5b9684b9bb071b01583 *man/bootnet-package.Rd
 18a6969964cec627b86549b9c10738bd *man/bootnet.Rd
 0f09e4af994cd459e71b25f38fa259b8 *man/corStability.Rd
 70b184f81d602a79d1479e1ff5931c97 *man/differenceTest.Rd
-186bcefce640d2405a1fb1b4b7a06fa2 *man/estimateNetwork.Rd
+f21b450120fe1e4849ff78bdaa711322 *man/estimateNetwork.Rd
 c557bf9cd02d26228292d635f69db43d *man/genGGM.Rd
 fbd2ea0bf52e46439064f633e3cd4b98 *man/ggmGenerator.Rd
 034726424b0eeb86140b16eb70629c73 *man/multiverse.Rd
