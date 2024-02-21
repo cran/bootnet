@@ -1,6 +1,6 @@
-408b4f9533590a3dd2f53d6808d41c31 *DESCRIPTION
+300f7d1e6d95b37f756a221c7068f07c *DESCRIPTION
 4f92e8bba882c717c32c877394aecc68 *NAMESPACE
-677920aa23aeee0b871a94e2ef64eebd *NEWS
+8ec76a7b5db7ced3f964352275747154 *NEWS
 31440d51325f2bdd5938b98c5471dfba *R/Smetric.R
 e6ff392c5cf818d3f85ee482e06fc10d *R/bootInclude.R
 6da6be1affeb9ee241f79b9c11f36d9f *R/bootTable.R
@@ -10,13 +10,13 @@ a0787d7fa8e881e15ca0be96700afaa2 *R/bootnetResultsMethods.R
 7ea565a70c328df0c4b94eaadc5de815 *R/centralityCompare.R
 2c52ee19510508f9ef7a21e7a9368ef1 *R/checkInput.R
 d41d8cd98f00b204e9800998ecf8427e *R/comparePlot.R
-cc2d7986e72cfdd54ae9b039d79d350e *R/defaultFunctions.R
+d3be0b3735882dc37df89cdff2d3d8a0 *R/defaultFunctions.R
 1507958a1246970ab6354a0edaca75d7 *R/estimateNetwork.R
 a59feeb9147a83835cd3786a15199f5f *R/multiverse.R
 00c95d972a5a95fb0a05c2661074a231 *R/netSimulator.R
 94c17bd8c4f7813e5dc8cff06da533fc *R/netSimulator_methods.R
 71587cbe3241da56a1da665558534145 *R/parSim.R
-fc8e47ec18da27ee7621bd900eee6add *R/plotMethod.R
+d70e2be0b53ec8a0f45b284ecdf7b4a5 *R/plotMethod.R
 5bb349a6bf860fab2d0b0e90db9b5ffb *R/printMethod.R
 d0ae2d76cd19023bacd138cf12757f19 *R/replicationSimulator.R
 2cf9eaf34e8baa2f7b8addc57dfe8483 *R/replicationSimulator_methods.R
@@ -34,7 +34,7 @@ b738f5d9fb36938fa0938158f5d267b5 *man/bootnet-package.Rd
 18a6969964cec627b86549b9c10738bd *man/bootnet.Rd
 0f09e4af994cd459e71b25f38fa259b8 *man/corStability.Rd
 70b184f81d602a79d1479e1ff5931c97 *man/differenceTest.Rd
-ea678baa819d35da9bab97a315bf3bcf *man/estimateNetwork.Rd
+7fa7c34a5dfacb838e758d5b6205cab2 *man/estimateNetwork.Rd
 c557bf9cd02d26228292d635f69db43d *man/genGGM.Rd
 fbd2ea0bf52e46439064f633e3cd4b98 *man/ggmGenerator.Rd
 034726424b0eeb86140b16eb70629c73 *man/multiverse.Rd
